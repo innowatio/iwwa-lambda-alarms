@@ -1,0 +1,58 @@
+{
+  "name": "iwwa-lambda-alarms",
+  "version": "1.0.0",
+  "description": "Lambda function to handle alarms",
+  "main": "src/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/innowation/iwwa-lambda-alarms.git"
+  },
+  "nyc": {
+    "require": [
+      "babel-register"
+    ],
+    "sourceMap": false,
+    "instrument": false
+  },
+  "dependencies": {
+    "axios": "^0.15.1",
+    "babel-polyfill": "^6.13.0",
+    "bluebird": "^3.4.3",
+    "dotenv": "^2.0.0",
+    "kinesis-router": "^1.3.1",
+    "lodash.get": "^4.4.2",
+    "lodash.isstring": "^4.0.1",
+    "lodash.sum": "^4.0.2",
+    "moment": "^2.15.1",
+    "mongodb": "^2.2.9",
+    "sift": "^3.2.6"
+  },
+  "devDependencies": {
+    "babel-cli": "6.14.0",
+    "babel-core": "^6.14.0",
+    "babel-eslint": "^6.1.2",
+    "babel-plugin-istanbul": "^2.0.0",
+    "babel-plugin-rewire": "^1.0.0",
+    "babel-preset-es2015": "^6.14.0",
+    "babel-preset-stage-0": "^6.5.0",
+    "babel-register": "^6.14.0",
+    "chai": "^3.5.0",
+    "codecov": "^1.0.1",
+    "eslint": "^3.4.0",
+    "mocha": "^3.0.2",
+    "nock": "^8.1.0",
+    "nyc": "^8.1.0",
+    "sinon": "^1.17.6",
+    "sinon-chai": "^2.8.0"
+  },
+  "scripts": {
+    "build": "babel src -d bundle",
+    "codecov": "NODE_ENV=test NODE_PATH=src nyc mocha report --reporter=text-lcov > coverage.lcov --recursive && codecov",
+    "coverage": "NODE_ENV=test NODE_PATH=src nyc mocha --recursive",
+    "dev": "npm test -- --watch",
+    "lint": "eslint src test",
+    "test": "NODE_ENV=test NODE_PATH=src mocha --compilers js:babel-register --require babel-polyfill --recursive"
+  },
+  "author": "Team Wattellina <wattellina@mondora.com>",
+  "license": "Apache-2.0"
+}
