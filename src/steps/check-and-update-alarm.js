@@ -2,7 +2,7 @@ import siftValidator from "../lib/sift-validator";
 import getAlarmReadingValue from "./get-alarm-reading-value";
 import {getOrCreateAlarmAggregate} from "./get-or-create-alarm-aggregate";
 import parseAggregate from "./parse-aggregate";
-import pushNotification from "./push-notifications";
+import pushNotification from "./push-notification";
 import log from "../services/logger";
 import {triggerPushNotifications} from "./trigger-push-notifications";
 import stringifyAggregate from "./stringify-aggregate";

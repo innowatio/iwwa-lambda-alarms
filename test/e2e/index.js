@@ -1,5 +1,4 @@
 import chai, {expect} from "chai";
-import nock from "nock";
 import sinon from "sinon";
 import sinonChai from "sinon-chai";
 chai.use(sinonChai);
@@ -10,7 +9,7 @@ import {
     ALARMS_AGGREGATES_COLLECTION_NAME,
     DAILY_AGGREGATES_COLLECTION_NAME,
     CONSUMPTION_AGGREGATES_COLLECTION_NAME,
-    NOTIFICATIONS_API_ENDPOINT
+    NOTIFICATIONS_INSERT
 } from "config";
 import pipeline from "pipeline";
 import {getMongoClient} from "services/mongodb";
@@ -21,6 +20,7 @@ import {
     alarmRealtime,
     getEnergyReadings
 } from "../utils";
+import pushNotification from "steps/push-notification";
 
 
 describe("On reading", () => {
@@ -87,14 +87,7 @@ describe("On reading", () => {
     var alarmsAggregates;
     var dailyAggregates;
     var yearlyAggregates;
-
-    const api = () => {
-        const lastSlashIndex = NOTIFICATIONS_API_ENDPOINT.lastIndexOf("/");
-        return {
-            url: NOTIFICATIONS_API_ENDPOINT.substring(0, lastSlashIndex),
-            route: NOTIFICATIONS_API_ENDPOINT.substring(lastSlashIndex, NOTIFICATIONS_API_ENDPOINT.length)
-        };
-    };
+    const dispatchEvent = sinon.spy();
 
     before(async () => {
         clock = sinon.useFakeTimers(1453939200000);
@@ -103,6 +96,7 @@ describe("On reading", () => {
         alarmsAggregates = db.collection(ALARMS_AGGREGATES_COLLECTION_NAME);
         dailyAggregates = db.collection(DAILY_AGGREGATES_COLLECTION_NAME);
         yearlyAggregates = db.collection(CONSUMPTION_AGGREGATES_COLLECTION_NAME);
+        pushNotification.__Rewire__("dispatchEvent", dispatchEvent);
     });
 
     after(async () => {
@@ -111,6 +105,7 @@ describe("On reading", () => {
         await db.dropCollection(ALARMS_AGGREGATES_COLLECTION_NAME);
         await db.dropCollection(DAILY_AGGREGATES_COLLECTION_NAME);
         await db.dropCollection(CONSUMPTION_AGGREGATES_COLLECTION_NAME);
+        pushNotification.__ResetDependency__("dispatchEvent");
     });
 
     afterEach(async () => {
@@ -121,7 +116,7 @@ describe("On reading", () => {
     });
 
     beforeEach(async () => {
-        nock.cleanAll();
+        dispatchEvent.reset();
         await dailyAggregates.insert(dayAggregateActiveEnergy);
         await dailyAggregates.insert(dayAggregateReactiveEnergy);
         await dailyAggregates.insert(dayAggregateActiveEnergyForecast);
@@ -149,6 +144,13 @@ describe("On reading", () => {
                 expect(alarmAggregate).to.deep.equal(expectedAlarmAggregate);
             });
 
+            it("don't put the event in kinesis stream [CASE: alarm triggered]", async () => {
+                await alarms.insert(alarmRealtime(10));
+                const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
+                await run(handler, event);
+                expect(dispatchEvent).to.have.callCount(0);
+            });
+
             it("save the correct reading on alarm aggregated collection [CASE: alarm triggered]", async () => {
                 await alarms.insert(alarmRealtime(2));
                 const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
@@ -164,6 +166,33 @@ describe("On reading", () => {
                 const alarmAggregate = await alarmsAggregates.find({}).toArray();
                 expect(alarmAggregate).to.deep.equal(expectedAlarmAggregate);
             });
+
+            it("put the event in kinesis stream [CASE: alarm triggered]", async () => {
+                await alarms.insert(alarmRealtime(2));
+                const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
+                const expectedEventData = {
+                    element: {
+                        type: "alarm",
+                        title: "Allarme",
+                        message: "È stato superato il limite impostato per l'allarme di energia attiva superando il valore limite di 2 kWh con un valore di 3.808 kWh.",
+                        usersId: ["userId"]
+                    }
+                };
+                await run(handler, event);
+                expect(dispatchEvent).to.have.callCount(1);
+                expect(dispatchEvent).to.have.been.calledWith(
+                    NOTIFICATIONS_INSERT,
+                    expectedEventData
+                );
+            });
+
+            it("don't put the event in kinesis stream [CASE: alarm triggered but already archived]", async () => {
+                await alarms.insert(alarmRealtime(2));
+                const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading", undefined, true));
+                await run(handler, event);
+                expect(dispatchEvent).to.have.callCount(0);
+            });
+
 
         });
 
@@ -195,21 +224,24 @@ describe("On reading", () => {
                 expect(alarmAggregate).to.deep.equal(expectedAlarmAggregate);
             });
 
-            it("call the push notifications api with correct body [CASE: alarm ended]", async () => {
+            it("put the correct notifications event in kinesis stream [CASE: alarm ended]", async () => {
                 await alarms.insert(alarmRealtime(10));
                 await alarmsAggregates.insert(realtimeAlarmAggregate);
-                const event = getEventFromObject(getEnergyReadings("2016-01-28T07:41:36.389Z", "reading", undefined, false));
-                const expectedBody = {
-                    type: "alarm",
-                    title: "Allarme",
-                    message: "L'allarme di energia attiva è stato risolto",
-                    usersId: ["userId"]
+                const event = getEventFromObject(getEnergyReadings("2016-01-28T07:41:36.389Z", "reading"));
+                const expectedEventData = {
+                    element: {
+                        type: "alarm",
+                        title: "Allarme",
+                        message: "L'allarme di energia attiva è stato risolto",
+                        usersId: ["userId"]
+                    }
                 };
-                const myApi = nock(api().url)
-                    .post(api().route, expectedBody)
-                    .reply(200, {result: "OK"});
                 await run(handler, event);
-                myApi.done();
+                expect(dispatchEvent).to.have.callCount(1);
+                expect(dispatchEvent).to.have.been.calledWith(
+                    NOTIFICATIONS_INSERT,
+                    expectedEventData
+                );
             });
 
             it("save the correct reading on alarm aggregated collection [CASE: alarm triggered]", async () => {
@@ -229,21 +261,24 @@ describe("On reading", () => {
                 expect(alarmAggregate).to.deep.equal(expectedAlarmAggregate);
             });
 
-            it("call the push notifications api with correct body [CASE: alarm triggered]", async () => {
+            it("put the correct notifications event in kinesis stream [CASE: alarm triggered]", async () => {
                 await alarms.insert(alarmRealtime(2));
                 await alarmsAggregates.insert(realtimeAlarmAggregate);
-                const event = getEventFromObject(getEnergyReadings("2016-01-28T04:00:00.000Z", "reading", undefined, false));
-                const expectedBody = {
-                    type: "alarm",
-                    title: "Allarme",
-                    message: "È stato superato il limite impostato per l'allarme di energia attiva superando il valore limite di 2 kWh con un valore di 3.808 kWh.",
-                    usersId: ["userId"]
+                const event = getEventFromObject(getEnergyReadings("2016-01-28T04:00:00.000Z", "reading"));
+                const expectedEventData = {
+                    element: {
+                        type: "alarm",
+                        title: "Allarme",
+                        message: "È stato superato il limite impostato per l'allarme di energia attiva superando il valore limite di 2 kWh con un valore di 3.808 kWh.",
+                        usersId: ["userId"]
+                    }
                 };
-                const myApi = nock(api().url)
-                    .post(api().route, expectedBody)
-                    .reply(200, {result: "OK"});
                 await run(handler, event);
-                myApi.done();
+                expect(dispatchEvent).to.have.callCount(1);
+                expect(dispatchEvent).to.have.been.calledWith(
+                    NOTIFICATIONS_INSERT,
+                    expectedEventData
+                );
             });
 
         });
@@ -276,6 +311,14 @@ describe("On reading", () => {
                 expect(alarmAggregate).to.deep.equal(expectedAlarmAggregate);
             });
 
+            it("don't call the dispatchEvent function [CASE: alarm not triggered]", async () => {
+                await alarms.insert(alarmRealtime(10));
+                await alarmsAggregates.insert(realtimeAlarmAggregate);
+                const event = getEventFromObject(getEnergyReadings("2016-01-28T02:41:36.389Z", "reading"));
+                await run(handler, event);
+                expect(dispatchEvent).to.have.callCount(0);
+            });
+
             it("save the correct reading on alarm aggregated collection [CASE: alarm triggered]", async () => {
                 await alarms.insert(alarmRealtime(2));
                 await alarmsAggregates.insert(realtimeAlarmAggregate);
@@ -293,21 +336,24 @@ describe("On reading", () => {
                 expect(alarmAggregate).to.deep.equal(expectedAlarmAggregate);
             });
 
-            it("call the push notifications api with correct body [CASE: alarm triggered]", async () => {
+            it("put the correct notifications event in kinesis stream [CASE: alarm triggered]", async () => {
                 await alarms.insert(alarmRealtime(2));
                 await alarmsAggregates.insert(realtimeAlarmAggregate);
-                const event = getEventFromObject(getEnergyReadings("2016-01-28T02:41:36.389Z", "reading", undefined, false));
-                const expectedBody = {
-                    type: "alarm",
-                    title: "Allarme",
-                    message: "È stato superato il limite impostato per l'allarme di energia attiva superando il valore limite di 2 kWh con un valore di 3.808 kWh.",
-                    usersId: ["userId"]
+                const event = getEventFromObject(getEnergyReadings("2016-01-28T02:41:36.389Z", "reading"));
+                const expectedEventData = {
+                    element: {
+                        type: "alarm",
+                        title: "Allarme",
+                        message: "È stato superato il limite impostato per l'allarme di energia attiva superando il valore limite di 2 kWh con un valore di 3.808 kWh.",
+                        usersId: ["userId"]
+                    }
                 };
-                const myApi = nock(api().url)
-                    .post(api().route, expectedBody)
-                    .reply(200, {result: "OK"});
                 await run(handler, event);
-                myApi.done();
+                expect(dispatchEvent).to.have.callCount(1);
+                expect(dispatchEvent).to.have.been.calledWith(
+                    NOTIFICATIONS_INSERT,
+                    expectedEventData
+                );
             });
 
         });
@@ -322,6 +368,13 @@ describe("On reading", () => {
             await run(handler, event);
             const alarmAggregate = await alarmsAggregates.find({}).toArray();
             expect(alarmAggregate).to.deep.equal([]);
+        });
+
+        it("with alarm not triggered don't call the dispatchEvent function", async () => {
+            await alarms.insert(alarmDaily(20));
+            const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
+            await run(handler, event);
+            expect(dispatchEvent).to.have.callCount(0);
         });
 
         it("on alarm triggered save the correct reading on alarm aggregated collection", async () => {
@@ -340,27 +393,30 @@ describe("On reading", () => {
             expect(alarmAggregate).to.deep.equal(expectedAlarmAggregate);
         });
 
-        it("on alarm triggered call the push notifications api with correct body", async () => {
+        it("on alarm triggered call the dispatchEvent function with correct event", async () => {
             await alarms.insert(alarmDaily(16));
-            const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading", undefined, false));
-            const expectedBody = {
-                type: "alarm",
-                title: "Allarme",
-                message: "I consumi hanno superato il limite giornaliero di energia attiva impostato.",
-                usersId: ["userId"]
+            const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
+            const expectedEventData = {
+                element: {
+                    type: "alarm",
+                    title: "Allarme",
+                    message: "I consumi hanno superato il limite giornaliero di energia attiva impostato.",
+                    usersId: ["userId"]
+                }
             };
-            const myApi = nock(api().url)
-                .post(api().route, expectedBody)
-                .reply(200, {result: "OK"});
             await run(handler, event);
-            myApi.done();
+            expect(dispatchEvent).to.have.callCount(1);
+            expect(dispatchEvent).to.have.been.calledWith(
+                NOTIFICATIONS_INSERT,
+                expectedEventData
+            );
         });
 
         it("on multiple reading save only the correct one on alarm aggregated collection", async () => {
             await alarms.insert(alarmDaily(16.907));
-            const event1 = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading", undefined, false));
-            const event2 = getEventFromObject(getEnergyReadings("2016-01-28T03:25:00.544Z", "reading", undefined, false));
-            const event3 = getEventFromObject(getEnergyReadings("2016-01-28T08:25:00.544Z", "reading", undefined, false));
+            const event1 = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
+            const event2 = getEventFromObject(getEnergyReadings("2016-01-28T03:25:00.544Z", "reading"));
+            const event3 = getEventFromObject(getEnergyReadings("2016-01-28T08:25:00.544Z", "reading"));
             const expectedAlarmAggregate = [{
                 _id: "alarmIdDaily-2016-01-28",
                 alarmId: "alarmIdDaily",
@@ -369,21 +425,11 @@ describe("On reading", () => {
                 measurementValues: "1",
                 measurementTimes: "1453940196389"
             }];
-            const expectedBody = {
-                type: "alarm",
-                title: "Allarme",
-                message: "I consumi hanno superato il limite giornaliero di energia attiva impostato.",
-                usersId: ["userId"]
-            };
-            const myApi = nock(api().url)
-                .post(api().route, expectedBody)
-                .reply(200, {result: "OK"});
             await run(handler, event1);
             await run(handler, event2);
             await run(handler, event3);
             const alarmAggregate = await alarmsAggregates.find({}).toArray();
             expect(alarmAggregate).to.deep.equal(expectedAlarmAggregate);
-            myApi.done();
         });
 
     });
@@ -396,6 +442,13 @@ describe("On reading", () => {
             await run(handler, event);
             const alarmAggregate = await alarmsAggregates.find({}).toArray();
             expect(alarmAggregate).to.deep.equal([]);
+        });
+
+        it("with alarm not triggered don't call the dispatchEvent function", async () => {
+            await alarms.insert(alarmDaily(20));
+            const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
+            await run(handler, event);
+            expect(dispatchEvent).to.have.callCount(0);
         });
 
         it("on alarm triggered save the correct reading on alarm aggregated collection", async () => {
@@ -414,27 +467,30 @@ describe("On reading", () => {
             expect(alarmAggregate).to.deep.equal(expectedAlarmAggregate);
         });
 
-        it("call the push notifications api with correct body", async () => {
+        it("on alarm triggered call the dispatchEvent function with correct event", async () => {
             await alarms.insert(alarmMonthly(80));
-            const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading", undefined, false));
-            const expectedBody = {
-                type: "alarm",
-                title: "Allarme",
-                message: "I consumi hanno superato il limite mensile di energia attiva impostato.",
-                usersId: ["userId"]
+            const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
+            const expectedEventData = {
+                element: {
+                    type: "alarm",
+                    title: "Allarme",
+                    message: "I consumi hanno superato il limite mensile di energia attiva impostato.",
+                    usersId: ["userId"]
+                }
             };
-            const myApi = nock(api().url)
-                .post(api().route, expectedBody)
-                .reply(200, {result: "OK"});
             await run(handler, event);
-            myApi.done();
+            expect(dispatchEvent).to.have.callCount(1);
+            expect(dispatchEvent).to.have.been.calledWith(
+                NOTIFICATIONS_INSERT,
+                expectedEventData
+            );
         });
 
-        it("on multiple reading save only the correct one on alarm aggregated collection and call push notification api", async () => {
+        it("on multiple reading save only the correct one on alarm aggregated collection", async () => {
             await alarms.insert(alarmMonthly(80));
-            const event1 = getEventFromObject(getEnergyReadings("2016-01-28T01:14:26.389Z", "reading", undefined, false));
-            const event2 = getEventFromObject(getEnergyReadings("2016-01-28T03:25:00.544Z", "reading", undefined, false));
-            const event3 = getEventFromObject(getEnergyReadings("2016-01-28T08:25:00.544Z", "reading", undefined, false));
+            const event1 = getEventFromObject(getEnergyReadings("2016-01-28T01:14:26.389Z", "reading"));
+            const event2 = getEventFromObject(getEnergyReadings("2016-01-28T03:25:00.544Z", "reading"));
+            const event3 = getEventFromObject(getEnergyReadings("2016-01-28T08:25:00.544Z", "reading"));
             const expectedAlarmAggregate = [{
                 _id: "alarmIdMonthly-2016-01",
                 alarmId: "alarmIdMonthly",
@@ -443,28 +499,18 @@ describe("On reading", () => {
                 measurementValues: "1",
                 measurementTimes: "1453943666389"
             }];
-            const expectedBody = {
-                type: "alarm",
-                title: "Allarme",
-                message: "I consumi hanno superato il limite mensile di energia attiva impostato.",
-                usersId: ["userId"]
-            };
-            const myApi = nock(api().url)
-                .post(api().route, expectedBody)
-                .reply(200, {result: "OK"});
             await run(handler, event1);
             await run(handler, event2);
             await run(handler, event3);
             const alarmAggregate = await alarmsAggregates.find({}).toArray();
             expect(alarmAggregate).to.deep.equal(expectedAlarmAggregate);
-            myApi.done();
         });
 
     });
 
     describe("with more alarm on a sensorId", () => {
 
-        it("save the correct reading on alarm aggregated collection and call push notification api", async () => {
+        it("save the correct reading on alarm aggregated collection and call dispatchEvent function with correct arguments", async () => {
             const alarm = {
                 _id: "alarmIdRealtimeReactive",
                 userId: "userId",
@@ -479,7 +525,7 @@ describe("On reading", () => {
             await alarms.insert(alarmDaily(20));
             await alarms.insert(alarmMonthly(2));
             await alarms.insert(alarm);
-            const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading", undefined, false));
+            const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
             const expectedAlarmAggregate = [{
                 _id: "alarmIdRealtime-2016-01-28",
                 alarmId: "alarmIdRealtime",
@@ -503,28 +549,33 @@ describe("On reading", () => {
                 measurementTimes: "1453940196389"
             }];
             const expectedBody1 = {
-                type: "alarm",
-                title: "Allarme",
-                message: "I consumi hanno superato il limite mensile di energia attiva impostato.",
-                usersId: ["userId"]
+                element: {
+                    type: "alarm",
+                    title: "Allarme",
+                    message: "È stato superato il limite impostato per l'allarme di energia reattiva superando il valore limite di 2 kVArh con un valore di 2.085 kVArh.",
+                    usersId: ["userId"]
+                }
             };
             const expectedBody2 = {
-                type: "alarm",
-                title: "Allarme",
-                message: "È stato superato il limite impostato per l'allarme di energia reattiva superando il valore limite di 2 kVArh con un valore di 2.085 kVArh.",
-                usersId: ["userId"]
+                element: {
+                    type: "alarm",
+                    title: "Allarme",
+                    message: "I consumi hanno superato il limite mensile di energia attiva impostato.",
+                    usersId: ["userId"]
+                }
             };
-            const myApi1 = nock(api().url)
-                .post(api().route, expectedBody1)
-                .reply(200, {result: "OK"});
-            const myApi2 = nock(api().url)
-                .post(api().route, expectedBody2)
-                .reply(200, {result: "OK"});
             await run(handler, event);
+            expect(dispatchEvent).to.have.callCount(2);
+            expect(dispatchEvent.firstCall).to.have.been.calledWith(
+                NOTIFICATIONS_INSERT,
+                expectedBody1
+            );
+            expect(dispatchEvent.secondCall).to.have.been.calledWith(
+                NOTIFICATIONS_INSERT,
+                expectedBody2
+            );
             const alarmAggregate = await alarmsAggregates.find({}).toArray();
             expect(alarmAggregate).to.deep.equal(expectedAlarmAggregate);
-            myApi1.done();
-            myApi2.done();
         });
 
     });

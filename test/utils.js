@@ -10,7 +10,7 @@ function addSource (reading, source, measurementLevel) {
     }
 }
 
-export function getEnergyReadings (date, source = "reading", measurementLevelSource, archived = true) {
+export function getEnergyReadings (date, source = "reading", measurementLevelSource, archived = false) {
     return addSource({
         "id": "eventId",
         "data": {

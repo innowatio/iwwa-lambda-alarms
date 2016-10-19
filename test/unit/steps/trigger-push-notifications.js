@@ -19,13 +19,13 @@ describe("trigger-push-notifications file", () => {
     describe("`triggerPushNotifications` function", () => {
 
         it("return `false` if event is archived", () => {
-            const event = getEnergyReadings("2016-01-28T00:16:36.389Z");
+            const event = getEnergyReadings("2016-01-28T00:16:36.389Z", undefined, undefined, true);
             const ret = triggerPushNotifications(event);
             expect(ret).to.equal(false);
         });
 
         it("return `false` if there isn't a today reading", () => {
-            const event = getEnergyReadings("2016-01-27T00:16:36.389Z", undefined, undefined, false);
+            const event = getEnergyReadings("2016-01-27T00:16:36.389Z", undefined);
             const ret = triggerPushNotifications(event, event.data.element);
             expect(ret).to.equal(false);
         });
@@ -35,13 +35,13 @@ describe("trigger-push-notifications file", () => {
     describe("`isAlarmTriggeredForTheFirstTime` function", () => {
 
         it("return `false` if no aggregate passed as argument", () => {
-            const event = getEnergyReadings("2016-01-28T00:16:36.389Z", undefined, undefined, false);
+            const event = getEnergyReadings("2016-01-28T00:16:36.389Z", undefined);
             const ret = isAlarmTriggeredForTheFirstTime(event.data.element);
             expect(ret).to.equal(false);
         });
 
         it("return `false` if alarm time is not present in alarm aggregate", () => {
-            const event = getEnergyReadings("2016-01-28T00:16:36.389Z", undefined, undefined, false);
+            const event = getEnergyReadings("2016-01-28T00:16:36.389Z", undefined);
             const alarmAggregate = {
                 _id: "alarmId-2016-01-28",
                 alarmId: "alarmId",
@@ -55,7 +55,7 @@ describe("trigger-push-notifications file", () => {
         });
 
         it("return `true` if alarm time triggered is the first in the selected day", () => {
-            const event = getEnergyReadings("2016-01-28T00:16:36.389Z", undefined, undefined, false);
+            const event = getEnergyReadings("2016-01-28T00:16:36.389Z", undefined);
             const alarmAggregate = {
                 _id: "alarmId-2016-01-28",
                 alarmId: "alarmId",
@@ -69,7 +69,7 @@ describe("trigger-push-notifications file", () => {
         });
 
         it("return `false` if alarm time triggered is in a series", () => {
-            const event = getEnergyReadings("2016-01-28T02:41:36.389Z", undefined, undefined, false);
+            const event = getEnergyReadings("2016-01-28T02:41:36.389Z", undefined);
             const alarmAggregate = {
                 _id: "alarmId-2016-01-28",
                 alarmId: "alarmId",
@@ -83,7 +83,7 @@ describe("trigger-push-notifications file", () => {
         });
 
         it("return `true` if alarm triggered is the first of a series", () => {
-            const event = getEnergyReadings("2016-01-28T02:41:36.389Z", undefined, undefined, false);
+            const event = getEnergyReadings("2016-01-28T02:41:36.389Z", undefined);
             const alarmAggregate = {
                 _id: "alarmId-2016-01-28",
                 alarmId: "alarmId",
@@ -101,13 +101,13 @@ describe("trigger-push-notifications file", () => {
     describe("`isAlarmEnded` function", () => {
 
         it("return `false` if no aggregate passed as argument", () => {
-            const event = getEnergyReadings("2016-01-28T00:16:36.389Z", undefined, undefined, false);
+            const event = getEnergyReadings("2016-01-28T00:16:36.389Z", undefined);
             const ret = isAlarmEnded(event.data.element);
             expect(ret).to.equal(false);
         });
 
         it("return `false` if alarm time is not present in alarm aggregate", () => {
-            const event = getEnergyReadings("2016-01-28T00:16:36.389Z", undefined, undefined, false);
+            const event = getEnergyReadings("2016-01-28T00:16:36.389Z", undefined);
             const alarmAggregate = {
                 _id: "alarmId-2016-01-28",
                 alarmId: "alarmId",
@@ -121,7 +121,7 @@ describe("trigger-push-notifications file", () => {
         });
 
         it("return `false` if alarm time triggered is the first in the selected day", () => {
-            const event = getEnergyReadings("2016-01-28T00:16:36.389Z", undefined, undefined, false);
+            const event = getEnergyReadings("2016-01-28T00:16:36.389Z", undefined);
             const alarmAggregate = {
                 _id: "alarmId-2016-01-28",
                 alarmId: "alarmId",
@@ -135,7 +135,7 @@ describe("trigger-push-notifications file", () => {
         });
 
         it("return `false` if is not the end of a alarm", () => {
-            const event = getEnergyReadings("2016-01-28T02:41:36.389Z", undefined, undefined, false);
+            const event = getEnergyReadings("2016-01-28T02:41:36.389Z", undefined);
             const alarmAggregate = {
                 _id: "alarmId-2016-01-28",
                 alarmId: "alarmId",
@@ -149,7 +149,7 @@ describe("trigger-push-notifications file", () => {
         });
 
         it("return `true` if alarm end", () => {
-            const event = getEnergyReadings("2016-01-28T02:41:36.389Z", undefined, undefined, false);
+            const event = getEnergyReadings("2016-01-28T02:41:36.389Z", undefined);
             const alarmAggregate = {
                 _id: "alarmId-2016-01-28",
                 alarmId: "alarmId",
