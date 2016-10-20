@@ -1,3 +1,5 @@
+import {v4} from "node-uuid";
+
 import {NOTIFICATIONS_INSERT} from "../config";
 import getMessage from "../lib/notification-message";
 import dispatchEvent from "../services/lk-dispatcher";
@@ -11,7 +13,8 @@ function createEvent (alarm, message) {
             title: "Allarme",
             message,
             usersId: [alarm.userId]
-        }
+        },
+        id: v4()
     };
 }
 

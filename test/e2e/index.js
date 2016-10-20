@@ -87,6 +87,7 @@ describe("On reading", () => {
     var alarmsAggregates;
     var dailyAggregates;
     var yearlyAggregates;
+    const v4 = sinon.stub().returns("d9b16d2d-9e08-4466-939f-534c8c25a00a");
     const dispatchEvent = sinon.spy();
 
     before(async () => {
@@ -97,6 +98,7 @@ describe("On reading", () => {
         dailyAggregates = db.collection(DAILY_AGGREGATES_COLLECTION_NAME);
         yearlyAggregates = db.collection(CONSUMPTION_AGGREGATES_COLLECTION_NAME);
         pushNotification.__Rewire__("dispatchEvent", dispatchEvent);
+        pushNotification.__Rewire__("v4", v4);
     });
 
     after(async () => {
@@ -106,6 +108,7 @@ describe("On reading", () => {
         await db.dropCollection(DAILY_AGGREGATES_COLLECTION_NAME);
         await db.dropCollection(CONSUMPTION_AGGREGATES_COLLECTION_NAME);
         pushNotification.__ResetDependency__("dispatchEvent");
+        pushNotification.__ResetDependency__("v4");
     });
 
     afterEach(async () => {
@@ -176,7 +179,8 @@ describe("On reading", () => {
                         title: "Allarme",
                         message: "È stato superato il limite impostato per l'allarme di energia attiva superando il valore limite di 2 kWh con un valore di 3.808 kWh.",
                         usersId: ["userId"]
-                    }
+                    },
+                    id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
                 };
                 await run(handler, event);
                 expect(dispatchEvent).to.have.callCount(1);
@@ -234,7 +238,8 @@ describe("On reading", () => {
                         title: "Allarme",
                         message: "L'allarme di energia attiva è stato risolto",
                         usersId: ["userId"]
-                    }
+                    },
+                    id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
                 };
                 await run(handler, event);
                 expect(dispatchEvent).to.have.callCount(1);
@@ -271,7 +276,8 @@ describe("On reading", () => {
                         title: "Allarme",
                         message: "È stato superato il limite impostato per l'allarme di energia attiva superando il valore limite di 2 kWh con un valore di 3.808 kWh.",
                         usersId: ["userId"]
-                    }
+                    },
+                    id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
                 };
                 await run(handler, event);
                 expect(dispatchEvent).to.have.callCount(1);
@@ -346,7 +352,8 @@ describe("On reading", () => {
                         title: "Allarme",
                         message: "È stato superato il limite impostato per l'allarme di energia attiva superando il valore limite di 2 kWh con un valore di 3.808 kWh.",
                         usersId: ["userId"]
-                    }
+                    },
+                    id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
                 };
                 await run(handler, event);
                 expect(dispatchEvent).to.have.callCount(1);
@@ -402,7 +409,8 @@ describe("On reading", () => {
                     title: "Allarme",
                     message: "I consumi hanno superato il limite giornaliero di energia attiva impostato.",
                     usersId: ["userId"]
-                }
+                },
+                id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
             };
             await run(handler, event);
             expect(dispatchEvent).to.have.callCount(1);
@@ -476,7 +484,8 @@ describe("On reading", () => {
                     title: "Allarme",
                     message: "I consumi hanno superato il limite mensile di energia attiva impostato.",
                     usersId: ["userId"]
-                }
+                },
+                id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
             };
             await run(handler, event);
             expect(dispatchEvent).to.have.callCount(1);
@@ -554,7 +563,8 @@ describe("On reading", () => {
                     title: "Allarme",
                     message: "È stato superato il limite impostato per l'allarme di energia reattiva superando il valore limite di 2 kVArh con un valore di 2.085 kVArh.",
                     usersId: ["userId"]
-                }
+                },
+                id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
             };
             const expectedBody2 = {
                 element: {
@@ -562,7 +572,8 @@ describe("On reading", () => {
                     title: "Allarme",
                     message: "I consumi hanno superato il limite mensile di energia attiva impostato.",
                     usersId: ["userId"]
-                }
+                },
+                id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
             };
             await run(handler, event);
             expect(dispatchEvent).to.have.callCount(2);
