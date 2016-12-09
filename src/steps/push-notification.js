@@ -3,7 +3,7 @@ import {v4} from "node-uuid";
 import {NOTIFICATIONS_INSERT} from "../config";
 import getMessage from "../lib/notification-message";
 import dispatchEvent from "../services/lk-dispatcher";
-import dispatchEmailEvent from "../steps/dispatch-email-event";
+import {dispatchEmailEvent} from "../steps/dispatch-email-event";
 import log from "../services/logger";
 import {isAlarmTriggeredForTheFirstTime, isAlarmEnded} from "./trigger-push-notifications";
 
