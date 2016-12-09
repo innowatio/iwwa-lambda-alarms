@@ -10,5 +10,7 @@ export const ALARMS_COLLECTION_NAME = "alarms";
 export const ALARMS_AGGREGATES_COLLECTION_NAME = "alarms-aggregates";
 export const DAILY_AGGREGATES_COLLECTION_NAME = "readings-daily-aggregates";
 export const CONSUMPTION_AGGREGATES_COLLECTION_NAME = "consumptions-yearly-aggregates";
+export const USERS_COLLECTION_NAME = "users";
 export const PRODUCER = "iwwa-lambda-alarms";
 export const NOTIFICATIONS_INSERT = "element inserted in collection notifications";
+export const EVENT_EMAIL_INSERTED = "element inserted in collection emails";

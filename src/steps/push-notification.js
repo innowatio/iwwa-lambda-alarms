@@ -3,6 +3,7 @@ import {v4} from "node-uuid";
 import {NOTIFICATIONS_INSERT} from "../config";
 import getMessage from "../lib/notification-message";
 import dispatchEvent from "../services/lk-dispatcher";
+import dispatchEmailEvent from "../steps/dispatch-email-event";
 import log from "../services/logger";
 import {isAlarmTriggeredForTheFirstTime, isAlarmEnded} from "./trigger-push-notifications";
 
@@ -21,6 +22,12 @@ function createEvent (alarm, message) {
 async function putNotificationRecordsInKinesis (alarm, message) {
     const eventData = createEvent(alarm, message);
     log.info(eventData, "event put in kinesis");
+
+    // check if is enabled email notifications
+    if (alarm.email) {
+        dispatchEmailEvent(alarm);
+    }
+
     await dispatchEvent(NOTIFICATIONS_INSERT, eventData);
 }
 

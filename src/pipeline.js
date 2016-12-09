@@ -21,6 +21,7 @@ export default async function pipeline (event) {
     const alarms = await findAlarmsBySensor(rawReading.sensorId);
     log.info(alarms, "Alarms for selected sensors");
     const readings = spreadReadingByMeasurementType(rawReading);
+
     await map(alarms, alarm => {
         return map(readings, async reading => await checkAndUpdateAlarm(alarm, reading, event));
     });
