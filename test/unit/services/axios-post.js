@@ -5,20 +5,20 @@ chai.use(sinonChai);
 
 import {getUserInfo} from "services/axios-post";
 
-nock("https://sso.innowatio.it/openam/json/users").get("/user.test").reply(200,
-    {
-        username: "user.test",
-        realm: "/",
-        uid: [ "user.test" ],
-        inetUserStatus: [ "Active" ],
-        mail: [ "user.test@mail.com" ]
-    }
-);
+
 
 describe("`getUserInfo` function", () => {
-
+    nock("https://sso.innowatio.it/openam/json/users").get("/user.test").times(1).reply(200,
+        {
+            username: "user.test",
+            realm: "/",
+            uid: [ "user.test" ],
+            inetUserStatus: [ "Active" ],
+            mail: [ "user.test@mail.com" ]
+        }
+    );
     const uid = "user.test";
-    const token = "tocken";
+    const token = "_tocken";
     const email = "user.test@mail.com";
     it("return the user Info from SSO", async () => {
         const ret = await getUserInfo(uid, token);

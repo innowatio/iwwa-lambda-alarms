@@ -43,6 +43,19 @@ export function getEnergyReadings (date, source = "reading", measurementLevelSou
     }, source, measurementLevelSource);
 }
 
+export const user = ({
+    "_id" : "userId",
+    "services" : {
+        "sso" : {
+            "token" : "token",
+            "uid" : "user.test"
+        }
+    },
+    "roles" : [
+        "admin"
+    ]
+});
+
 export const alarmRealtime = (thresholdValue) => ({
     "_id": "alarmIdRealtime",
     "userId": "userId",
@@ -51,7 +64,8 @@ export const alarmRealtime = (thresholdValue) => ({
     "type": "realtime",
     "thresholdRule": `{"$gt": ${thresholdValue}}`,
     "unitOfMeasurement": "kWh",
-    "threshold": thresholdValue
+    "threshold": thresholdValue,
+    "email": true
 });
 
 export const alarmDaily  = (thresholdValue) => ({
@@ -62,7 +76,8 @@ export const alarmDaily  = (thresholdValue) => ({
     "type": "daily",
     "thresholdRule": `{"$gt": ${thresholdValue}}`,
     "unitOfMeasurement": "kWh",
-    "threshold": thresholdValue
+    "threshold": thresholdValue,
+    "email": true
 });
 
 export const alarmMonthly = (thresholdValue) => ({
@@ -73,7 +88,8 @@ export const alarmMonthly = (thresholdValue) => ({
     "type": "monthly",
     "thresholdRule": `{"$gt": ${thresholdValue}}`,
     "unitOfMeasurement": "kWh",
-    "threshold": thresholdValue
+    "threshold": thresholdValue,
+    "email": true
 });
 
 export const dayAggregateActiveEnergy = {

@@ -1,18 +1,20 @@
 import dispatchEvent from "../services/lk-dispatcher";
 import {getMongoClient} from "../services/mongodb";
 import {getUserInfo} from "../services/axios-post";
+import log from "../services/logger";
 import {EVENT_EMAIL_INSERTED, USERS_COLLECTION_NAME} from "config";
 
-export async function dispatchEmailEvent (rawReading) {
+export async function dispatchEmailEvent (rawReading, message) {
     const toAddresses = await getUserEmail(rawReading.userId);
     const kinesisEvent = {
         element: {
             timestamp: new Date().toISOString(),
             toAddresses: toAddresses,
-            message: getMessage(rawReading),
-            subject: getSubject(rawReading)
+            message: message,
+            subject: "Lucy Alarm"
         }
     };
+    log.fatal("element", kinesisEvent);
     await dispatchEvent(EVENT_EMAIL_INSERTED, kinesisEvent);
 }
 
@@ -25,16 +27,4 @@ async function getUserEmail (userId) {
         return ssoInfo.mail;
     }
     return null;
-}
-
-function getSubject (rawReading) {
-    return "Lucy Alarm - " + rawReading.name;
-}
-
-function getMessage (rawReading) {
-    return "Alarm: " + rawReading.name + "\n"
-    + "SensorId: " + rawReading.sensorId + "\n"
-    + "Measurement Type: "+ rawReading.measurementType + "\n"
-    + "Unit of Measure: " + rawReading.unitOfMeasurement + "\n"
-    + "threshold: " + rawReading.threshold;
 }

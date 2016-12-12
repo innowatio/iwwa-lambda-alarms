@@ -1,6 +1,7 @@
 import chai, {expect} from "chai";
 import sinon from "sinon";
 import sinonChai from "sinon-chai";
+import nock from "nock";
 chai.use(sinonChai);
 
 import {handler} from "index";
@@ -9,7 +10,8 @@ import {
     ALARMS_AGGREGATES_COLLECTION_NAME,
     DAILY_AGGREGATES_COLLECTION_NAME,
     CONSUMPTION_AGGREGATES_COLLECTION_NAME,
-    NOTIFICATIONS_INSERT
+    NOTIFICATIONS_INSERT,
+    USERS_COLLECTION_NAME
 } from "config";
 import pipeline from "pipeline";
 import {getMongoClient} from "services/mongodb";
@@ -18,13 +20,13 @@ import {
     alarmDaily,
     alarmMonthly,
     alarmRealtime,
-    getEnergyReadings
+    getEnergyReadings,
+    user
 } from "../utils";
 import pushNotification from "steps/push-notification";
 
 
 describe("On reading", () => {
-
     const dayAggregateActiveEnergy = {
         _id: "sensorId-2016-01-28-reading-activeEnergy",
         sensorId: "sensorId",
@@ -82,6 +84,7 @@ describe("On reading", () => {
 
 
     var db;
+    var users;
     var alarms;
     var clock;
     var alarmsAggregates;
@@ -92,27 +95,42 @@ describe("On reading", () => {
 
     before(async () => {
         clock = sinon.useFakeTimers(1453939200000);
+
+        nock("https://sso.innowatio.it/openam/json/users").get("/user.test").times(14).reply(200, {
+            username: "user.test",
+            realm: "/",
+            uid: [ "user.test" ],
+            inetUserStatus: [ "Active" ],
+            mail: [ "user.test@mail.com" ]
+        });
+
         db = await getMongoClient();
         alarms = db.collection(ALARMS_COLLECTION_NAME);
+        users = db.collection(USERS_COLLECTION_NAME);
         alarmsAggregates = db.collection(ALARMS_AGGREGATES_COLLECTION_NAME);
         dailyAggregates = db.collection(DAILY_AGGREGATES_COLLECTION_NAME);
         yearlyAggregates = db.collection(CONSUMPTION_AGGREGATES_COLLECTION_NAME);
+
         pushNotification.__Rewire__("dispatchEvent", dispatchEvent);
         pushNotification.__Rewire__("v4", v4);
     });
 
     after(async () => {
         clock.restore();
+        await db.dropCollection(USERS_COLLECTION_NAME);
         await db.dropCollection(ALARMS_COLLECTION_NAME);
         await db.dropCollection(ALARMS_AGGREGATES_COLLECTION_NAME);
         await db.dropCollection(DAILY_AGGREGATES_COLLECTION_NAME);
         await db.dropCollection(CONSUMPTION_AGGREGATES_COLLECTION_NAME);
         pushNotification.__ResetDependency__("dispatchEvent");
         pushNotification.__ResetDependency__("v4");
+
+
     });
 
     afterEach(async () => {
         await alarms.remove({});
+        await users.remove({});
         await alarmsAggregates.remove({});
         await dailyAggregates.remove({});
         await yearlyAggregates.remove({});
@@ -120,6 +138,7 @@ describe("On reading", () => {
 
     beforeEach(async () => {
         dispatchEvent.reset();
+        await users.insert(user);
         await dailyAggregates.insert(dayAggregateActiveEnergy);
         await dailyAggregates.insert(dayAggregateReactiveEnergy);
         await dailyAggregates.insert(dayAggregateActiveEnergyForecast);
@@ -621,5 +640,4 @@ describe("On reading", () => {
         });
 
     });
-
 });

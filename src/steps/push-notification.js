@@ -25,7 +25,7 @@ async function putNotificationRecordsInKinesis (alarm, message) {
 
     // check if is enabled email notifications
     if (alarm.email) {
-        dispatchEmailEvent(alarm);
+        dispatchEmailEvent(alarm, message);
     }
 
     await dispatchEvent(NOTIFICATIONS_INSERT, eventData);
