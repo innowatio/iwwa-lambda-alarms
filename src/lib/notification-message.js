@@ -1,4 +1,6 @@
-function getType (type) {
+import {getSensorInfo} from "./get-sensor-info";
+
+export function getType (type) {
     switch (type) {
     case "daily":
         return "giornaliero";
@@ -9,7 +11,7 @@ function getType (type) {
     }
 }
 
-function getMeasurementType (measurementType) {
+export function getMeasurementType (measurementType) {
     switch (measurementType) {
     case "activeEnergy":
         return "energia attiva";
@@ -22,29 +24,33 @@ function getMeasurementType (measurementType) {
     }
 }
 
-function getPeriodicMessage (type, reading) {
+function getPeriodicMessage (type, reading, sensorInfo) {
     const period = getType(type);
     const measurementType = getMeasurementType(reading.measurementType);
-    return `I consumi hanno superato il limite ${period} di ${measurementType} impostato.`;
+    const {sensorName, siteName} = sensorInfo;
+    return `I consumi per il sensore ${sensorName} del sito ${siteName} hanno superato il limite ${period} di ${measurementType} impostato.`;
 }
 
-function getRealtimeMessageTriggered (reading, alarm) {
+function getRealtimeMessageTriggered (reading, alarm, sensorInfo) {
     const measurementType = getMeasurementType(reading.measurementType);
-    return `È stato superato il limite impostato per l'allarme di ${measurementType} superando il valore limite di ${alarm.threshold} ${alarm.unitOfMeasurement} con un valore di ${reading.measurementValue} ${reading.unitOfMeasurement}.`;
+    const {sensorName, siteName} = sensorInfo;
+    return `È stato superato il limite impostato per l'allarme del sensore ${sensorName} del sito ${siteName} di ${measurementType} superando il valore limite di ${alarm.threshold} ${alarm.unitOfMeasurement} con un valore di ${reading.measurementValue} ${reading.unitOfMeasurement}.`;
 }
 
-function getRealtimeMessageEnded (reading) {
+function getRealtimeMessageEnded (reading, sensorInfo) {
     const measurementType = getMeasurementType(reading.measurementType);
-    return `L'allarme di ${measurementType} è stato risolto`;
+    const {sensorName, siteName} = sensorInfo;
+    return `L'allarme del sensore ${sensorName} del sito ${siteName} di ${measurementType} è stato risolto`;
 }
 
-export default function getMessage (alarm, reading, alarmAggregate, status) {
+export default async function getMessage (alarm, reading, alarmAggregate, status) {
+    const sensorInfo = await getSensorInfo(alarm.sensorId);
     if (alarm.type !== "realtime") {
-        return getPeriodicMessage(alarm.type, reading);
+        return getPeriodicMessage(alarm.type, reading, sensorInfo);
     }
     return (
         status === "triggered" ?
-        getRealtimeMessageTriggered(reading, alarm) :
-        getRealtimeMessageEnded(reading)
+        getRealtimeMessageTriggered(reading, alarm, sensorInfo) :
+        getRealtimeMessageEnded(reading, sensorInfo)
     );
 }

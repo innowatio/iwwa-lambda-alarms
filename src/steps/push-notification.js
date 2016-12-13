@@ -1,9 +1,9 @@
 import {v4} from "node-uuid";
 
-import {NOTIFICATIONS_INSERT} from "../config";
+import {NOTIFICATIONS_INSERT, EVENT_EMAIL_INSERT} from "../config";
 import getMessage from "../lib/notification-message";
+import {getUserEmail} from "../steps/get-user-email";
 import dispatchEvent from "../services/lk-dispatcher";
-import {dispatchEmailEvent} from "../steps/dispatch-email-event";
 import log from "../services/logger";
 import {isAlarmTriggeredForTheFirstTime, isAlarmEnded} from "./trigger-push-notifications";
 
@@ -19,25 +19,38 @@ function createEvent (alarm, message) {
     };
 }
 
+async function createEventEmail (userId, message) {
+    const toAddresses = await getUserEmail(userId);
+    return {
+        element: {
+            timestamp: new Date().toISOString(),
+            toAddresses: toAddresses,
+            message: message,
+            subject: "Lucy Alarm"
+        }
+    };
+}
+
 async function putNotificationRecordsInKinesis (alarm, message) {
     const eventData = createEvent(alarm, message);
-    log.info(eventData, "event put in kinesis");
+    const eventEmail = await createEventEmail(alarm.userId, message);
+    log.info({eventData});
 
     // check if is enabled email notifications
     if (alarm.email) {
-        dispatchEmailEvent(alarm, message);
+        await dispatchEvent(EVENT_EMAIL_INSERT, eventEmail);
     }
 
     await dispatchEvent(NOTIFICATIONS_INSERT, eventData);
 }
 
 async function alarmTriggered (alarm, reading, alarmAggregate) {
-    const message = getMessage(alarm, reading, alarmAggregate, "triggered");
+    const message = await getMessage(alarm, reading, alarmAggregate, "triggered");
     return isAlarmTriggeredForTheFirstTime(reading, alarmAggregate) ? await putNotificationRecordsInKinesis(alarm, message) : null;
 }
 
 async function alarmNotTriggered (alarm, reading, alarmAggregate) {
-    const message = getMessage(alarm, reading, alarmAggregate, "ended");
+    const message = await getMessage(alarm, reading, alarmAggregate, "ended");
     return isAlarmEnded(reading, alarmAggregate) ? await putNotificationRecordsInKinesis(alarm, message) : null;
 }
 

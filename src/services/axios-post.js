@@ -1,4 +1,5 @@
 import axios from "axios";
+import log from "../services/logger";
 
 export async function getUserInfo (uid, token) {
     try {
@@ -8,12 +9,9 @@ export async function getUserInfo (uid, token) {
                 "Content-Type": "application/json"
             }
         });
-        if (200 != result.status && !result.data) {
-            return null;
-        }
         return result.data;
     } catch (err) {
-        console.error(err);
+        log.error(err);
     }
     return null;
 }

@@ -112,3 +112,18 @@ export const yearAggregateActiveEnergy = {
     unitOfMeasurement: "kWh",
     measurementsDeltaInMs: 86400000
 };
+
+export const site = {
+    _id: "siteId",
+    name: "Site Name",
+    sensorsIds: [
+        "sensorId",
+        "sensor1"
+    ]
+};
+
+export const sensor = {
+    _id:"sensorId",
+    name:"Sensor Name",
+    description: "Sensor description"
+};

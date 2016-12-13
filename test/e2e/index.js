@@ -6,11 +6,14 @@ chai.use(sinonChai);
 
 import {handler} from "index";
 import {
+    SITE_COLLECTION_NAME,
+    SENSOR_COLLECTION_NAME,
     ALARMS_COLLECTION_NAME,
     ALARMS_AGGREGATES_COLLECTION_NAME,
     DAILY_AGGREGATES_COLLECTION_NAME,
     CONSUMPTION_AGGREGATES_COLLECTION_NAME,
     NOTIFICATIONS_INSERT,
+    EVENT_EMAIL_INSERT,
     USERS_COLLECTION_NAME
 } from "config";
 import pipeline from "pipeline";
@@ -21,12 +24,20 @@ import {
     alarmMonthly,
     alarmRealtime,
     getEnergyReadings,
-    user
+    sensor,
+    site,
+    user,
 } from "../utils";
 import pushNotification from "steps/push-notification";
 
 
 describe("On reading", () => {
+    const realtimeMessageTriggered = "È stato superato il limite impostato per l'allarme del sensore Sensor Name del sito Site Name di energia attiva superando il valore limite di 2 kWh con un valore di 3.808 kWh.";
+    const realtimeMessageTriggered2 = "È stato superato il limite impostato per l'allarme del sensore Sensor Name del sito Site Name di energia reattiva superando il valore limite di 2 kVArh con un valore di 2.085 kVArh.";
+    const realtimeMessageEnded = "L'allarme del sensore Sensor Name del sito Site Name di energia attiva è stato risolto";
+    const dailyMessage = "I consumi per il sensore Sensor Name del sito Site Name hanno superato il limite giornaliero di energia attiva impostato.";
+    const monthlyMessage = "I consumi per il sensore Sensor Name del sito Site Name hanno superato il limite mensile di energia attiva impostato.";
+
     const dayAggregateActiveEnergy = {
         _id: "sensorId-2016-01-28-reading-activeEnergy",
         sensorId: "sensorId",
@@ -82,9 +93,30 @@ describe("On reading", () => {
         measurementsDeltaInMs: 86400000
     };
 
+    const expectedEventData = {
+        element: {
+            type: "alarm",
+            title: "Allarme",
+            message: realtimeMessageTriggered,
+            usersId: ["userId"]
+        },
+        id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
+    };
+
+    const expectedEventDataSolved = {
+        element: {
+            type: "alarm",
+            title: "Allarme",
+            message: realtimeMessageEnded,
+            usersId: ["userId"]
+        },
+        id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
+    };
 
     var db;
     var users;
+    var sites;
+    var sensors;
     var alarms;
     var clock;
     var alarmsAggregates;
@@ -105,19 +137,24 @@ describe("On reading", () => {
         });
 
         db = await getMongoClient();
-        alarms = db.collection(ALARMS_COLLECTION_NAME);
         users = db.collection(USERS_COLLECTION_NAME);
+        sites = db.collection(SITE_COLLECTION_NAME);
+        sensors = db.collection(SENSOR_COLLECTION_NAME);
+        alarms = db.collection(ALARMS_COLLECTION_NAME);
         alarmsAggregates = db.collection(ALARMS_AGGREGATES_COLLECTION_NAME);
         dailyAggregates = db.collection(DAILY_AGGREGATES_COLLECTION_NAME);
         yearlyAggregates = db.collection(CONSUMPTION_AGGREGATES_COLLECTION_NAME);
 
         pushNotification.__Rewire__("dispatchEvent", dispatchEvent);
         pushNotification.__Rewire__("v4", v4);
+
     });
 
     after(async () => {
         clock.restore();
         await db.dropCollection(USERS_COLLECTION_NAME);
+        await db.dropCollection(SITE_COLLECTION_NAME);
+        await db.dropCollection(SENSOR_COLLECTION_NAME);
         await db.dropCollection(ALARMS_COLLECTION_NAME);
         await db.dropCollection(ALARMS_AGGREGATES_COLLECTION_NAME);
         await db.dropCollection(DAILY_AGGREGATES_COLLECTION_NAME);
@@ -125,11 +162,12 @@ describe("On reading", () => {
         pushNotification.__ResetDependency__("dispatchEvent");
         pushNotification.__ResetDependency__("v4");
 
-
     });
 
     afterEach(async () => {
         await alarms.remove({});
+        await sites.remove({});
+        await sensors.remove({});
         await users.remove({});
         await alarmsAggregates.remove({});
         await dailyAggregates.remove({});
@@ -138,6 +176,8 @@ describe("On reading", () => {
 
     beforeEach(async () => {
         dispatchEvent.reset();
+        await sites.insert(site);
+        await sensors.insert(sensor);
         await users.insert(user);
         await dailyAggregates.insert(dayAggregateActiveEnergy);
         await dailyAggregates.insert(dayAggregateReactiveEnergy);
@@ -192,31 +232,35 @@ describe("On reading", () => {
             it("put the event in kinesis stream [CASE: alarm triggered]", async () => {
                 await alarms.insert(alarmRealtime(2));
                 const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
-                const expectedEventData = {
+
+                const expectedEventEmail = {
                     element: {
-                        type: "alarm",
-                        title: "Allarme",
-                        message: "È stato superato il limite impostato per l'allarme di energia attiva superando il valore limite di 2 kWh con un valore di 3.808 kWh.",
-                        usersId: ["userId"]
-                    },
-                    id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
+                        timestamp: new Date().toISOString(),
+                        toAddresses: ["user.test@mail.com"],
+                        message: realtimeMessageTriggered,
+                        subject: "Lucy Alarm"
+                    }
                 };
+
                 await run(handler, event);
-                expect(dispatchEvent).to.have.callCount(1);
-                expect(dispatchEvent).to.have.been.calledWith(
+                expect(dispatchEvent).to.have.callCount(2);
+
+                expect(dispatchEvent.firstCall).to.have.been.calledWith(
+                    EVENT_EMAIL_INSERT,
+                    expectedEventEmail
+                );
+
+                expect(dispatchEvent.secondCall).to.have.been.calledWith(
                     NOTIFICATIONS_INSERT,
                     expectedEventData
                 );
             });
-
             it("don't put the event in kinesis stream [CASE: alarm triggered but already archived]", async () => {
                 await alarms.insert(alarmRealtime(2));
                 const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading", undefined, true));
                 await run(handler, event);
                 expect(dispatchEvent).to.have.callCount(0);
             });
-
-
         });
 
         describe("with an alarm aggregate [CASE: alarm already triggered]", () => {
@@ -251,20 +295,27 @@ describe("On reading", () => {
                 await alarms.insert(alarmRealtime(10));
                 await alarmsAggregates.insert(realtimeAlarmAggregate);
                 const event = getEventFromObject(getEnergyReadings("2016-01-28T07:41:36.389Z", "reading"));
-                const expectedEventData = {
+
+                const expectedEventEmail = {
                     element: {
-                        type: "alarm",
-                        title: "Allarme",
-                        message: "L'allarme di energia attiva è stato risolto",
-                        usersId: ["userId"]
-                    },
-                    id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
+                        timestamp: new Date().toISOString(),
+                        toAddresses: ["user.test@mail.com"],
+                        message: realtimeMessageEnded,
+                        subject: "Lucy Alarm"
+                    }
                 };
+
                 await run(handler, event);
-                expect(dispatchEvent).to.have.callCount(1);
-                expect(dispatchEvent).to.have.been.calledWith(
+                expect(dispatchEvent).to.have.callCount(2);
+
+                expect(dispatchEvent.firstCall).to.have.been.calledWith(
+                    EVENT_EMAIL_INSERT,
+                    expectedEventEmail
+                );
+
+                expect(dispatchEvent.secondCall).to.have.been.calledWith(
                     NOTIFICATIONS_INSERT,
-                    expectedEventData
+                    expectedEventDataSolved
                 );
             });
 
@@ -289,18 +340,25 @@ describe("On reading", () => {
                 await alarms.insert(alarmRealtime(2));
                 await alarmsAggregates.insert(realtimeAlarmAggregate);
                 const event = getEventFromObject(getEnergyReadings("2016-01-28T04:00:00.000Z", "reading"));
-                const expectedEventData = {
+
+                const expectedEventEmail = {
                     element: {
-                        type: "alarm",
-                        title: "Allarme",
-                        message: "È stato superato il limite impostato per l'allarme di energia attiva superando il valore limite di 2 kWh con un valore di 3.808 kWh.",
-                        usersId: ["userId"]
-                    },
-                    id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
+                        timestamp: new Date().toISOString(),
+                        toAddresses: ["user.test@mail.com"],
+                        message: realtimeMessageTriggered,
+                        subject: "Lucy Alarm"
+                    }
                 };
+
                 await run(handler, event);
-                expect(dispatchEvent).to.have.callCount(1);
-                expect(dispatchEvent).to.have.been.calledWith(
+                expect(dispatchEvent).to.have.callCount(2);
+
+                expect(dispatchEvent.firstCall).to.have.been.calledWith(
+                    EVENT_EMAIL_INSERT,
+                    expectedEventEmail
+                );
+
+                expect(dispatchEvent.secondCall).to.have.been.calledWith(
                     NOTIFICATIONS_INSERT,
                     expectedEventData
                 );
@@ -365,18 +423,25 @@ describe("On reading", () => {
                 await alarms.insert(alarmRealtime(2));
                 await alarmsAggregates.insert(realtimeAlarmAggregate);
                 const event = getEventFromObject(getEnergyReadings("2016-01-28T02:41:36.389Z", "reading"));
-                const expectedEventData = {
+
+                const expectedEventEmail = {
                     element: {
-                        type: "alarm",
-                        title: "Allarme",
-                        message: "È stato superato il limite impostato per l'allarme di energia attiva superando il valore limite di 2 kWh con un valore di 3.808 kWh.",
-                        usersId: ["userId"]
-                    },
-                    id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
+                        timestamp: new Date().toISOString(),
+                        toAddresses: ["user.test@mail.com"],
+                        message: realtimeMessageTriggered,
+                        subject: "Lucy Alarm"
+                    }
                 };
+
                 await run(handler, event);
-                expect(dispatchEvent).to.have.callCount(1);
-                expect(dispatchEvent).to.have.been.calledWith(
+                expect(dispatchEvent).to.have.callCount(2);
+
+                expect(dispatchEvent.firstCall).to.have.been.calledWith(
+                    EVENT_EMAIL_INSERT,
+                    expectedEventEmail
+                );
+
+                expect(dispatchEvent.secondCall).to.have.been.calledWith(
                     NOTIFICATIONS_INSERT,
                     expectedEventData
                 );
@@ -426,14 +491,30 @@ describe("On reading", () => {
                 element: {
                     type: "alarm",
                     title: "Allarme",
-                    message: "I consumi hanno superato il limite giornaliero di energia attiva impostato.",
+                    message: dailyMessage,
                     usersId: ["userId"]
                 },
                 id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
             };
+
+            const expectedEventEmail = {
+                element: {
+                    timestamp: new Date().toISOString(),
+                    toAddresses: ["user.test@mail.com"],
+                    message: dailyMessage,
+                    subject: "Lucy Alarm"
+                }
+            };
+
             await run(handler, event);
-            expect(dispatchEvent).to.have.callCount(1);
-            expect(dispatchEvent).to.have.been.calledWith(
+            expect(dispatchEvent).to.have.callCount(2);
+
+            expect(dispatchEvent.firstCall).to.have.been.calledWith(
+                EVENT_EMAIL_INSERT,
+                expectedEventEmail
+            );
+
+            expect(dispatchEvent.secondCall).to.have.been.calledWith(
                 NOTIFICATIONS_INSERT,
                 expectedEventData
             );
@@ -497,18 +578,35 @@ describe("On reading", () => {
         it("on alarm triggered call the dispatchEvent function with correct event", async () => {
             await alarms.insert(alarmMonthly(80));
             const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
+
             const expectedEventData = {
                 element: {
                     type: "alarm",
                     title: "Allarme",
-                    message: "I consumi hanno superato il limite mensile di energia attiva impostato.",
+                    message: monthlyMessage,
                     usersId: ["userId"]
                 },
                 id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
             };
+
+            const expectedEventEmail = {
+                element: {
+                    timestamp: new Date().toISOString(),
+                    toAddresses: ["user.test@mail.com"],
+                    message: monthlyMessage,
+                    subject: "Lucy Alarm"
+                }
+            };
+
             await run(handler, event);
-            expect(dispatchEvent).to.have.callCount(1);
-            expect(dispatchEvent).to.have.been.calledWith(
+            expect(dispatchEvent).to.have.callCount(2);
+
+            expect(dispatchEvent.firstCall).to.have.been.calledWith(
+                EVENT_EMAIL_INSERT,
+                expectedEventEmail
+            );
+
+            expect(dispatchEvent.secondCall).to.have.been.calledWith(
                 NOTIFICATIONS_INSERT,
                 expectedEventData
             );
@@ -580,7 +678,7 @@ describe("On reading", () => {
                 element: {
                     type: "alarm",
                     title: "Allarme",
-                    message: "È stato superato il limite impostato per l'allarme di energia reattiva superando il valore limite di 2 kVArh con un valore di 2.085 kVArh.",
+                    message: realtimeMessageTriggered2,
                     usersId: ["userId"]
                 },
                 id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
@@ -589,18 +687,32 @@ describe("On reading", () => {
                 element: {
                     type: "alarm",
                     title: "Allarme",
-                    message: "I consumi hanno superato il limite mensile di energia attiva impostato.",
+                    message: monthlyMessage,
                     usersId: ["userId"]
                 },
                 id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
             };
+
+            const expectedEventEmail = {
+                element: {
+                    timestamp: new Date().toISOString(),
+                    toAddresses: ["user.test@mail.com"],
+                    message: monthlyMessage,
+                    subject: "Lucy Alarm"
+                }
+            };
+
             await run(handler, event);
-            expect(dispatchEvent).to.have.callCount(2);
+            expect(dispatchEvent).to.have.callCount(3);
             expect(dispatchEvent.firstCall).to.have.been.calledWith(
                 NOTIFICATIONS_INSERT,
                 expectedBody1
             );
             expect(dispatchEvent.secondCall).to.have.been.calledWith(
+                EVENT_EMAIL_INSERT,
+                expectedEventEmail
+            );
+            expect(dispatchEvent.thirdCall).to.have.been.calledWith(
                 NOTIFICATIONS_INSERT,
                 expectedBody2
             );
