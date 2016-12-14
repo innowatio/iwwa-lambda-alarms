@@ -32,11 +32,11 @@ import pushNotification from "steps/push-notification";
 
 
 describe("On reading", () => {
-    const realtimeMessageTriggered = "È stato superato il limite impostato per l'allarme del sensore Sensor Name del sito Site Name di energia attiva superando il valore limite di 2 kWh con un valore di 3.808 kWh.";
-    const realtimeMessageTriggered2 = "È stato superato il limite impostato per l'allarme del sensore Sensor Name del sito Site Name di energia reattiva superando il valore limite di 2 kVArh con un valore di 2.085 kVArh.";
-    const realtimeMessageEnded = "L'allarme del sensore Sensor Name del sito Site Name di energia attiva è stato risolto";
-    const dailyMessage = "I consumi per il sensore Sensor Name del sito Site Name hanno superato il limite giornaliero di energia attiva impostato.";
-    const monthlyMessage = "I consumi per il sensore Sensor Name del sito Site Name hanno superato il limite mensile di energia attiva impostato.";
+    const realtimeMessageTriggered = "È stato superato il limite impostato per l'allarme del sensore Sensor Name di energia attiva superando il valore limite di 2 kWh con un valore di 3.808 kWh.";
+    const realtimeMessageTriggered2 = "È stato superato il limite impostato per l'allarme del sensore Sensor Name di energia reattiva superando il valore limite di 2 kVArh con un valore di 2.085 kVArh.";
+    const realtimeMessageEnded = "L'allarme del sensore Sensor Name di energia attiva è stato risolto";
+    const dailyMessage = "I consumi per il sensore Sensor Name hanno superato il limite giornaliero di energia attiva impostato.";
+    const monthlyMessage = "I consumi per il sensore Sensor Name hanno superato il limite mensile di energia attiva impostato.";
 
     const dayAggregateActiveEnergy = {
         _id: "sensorId-2016-01-28-reading-activeEnergy",
