@@ -8,7 +8,7 @@ export async function getUserEmail (userId) {
     if (user && user.services) {
         const {uid, token} = user.services.sso;
         const ssoInfo = await getUserInfo(uid, token);
-        return ssoInfo.mail;
+        return ssoInfo ? ssoInfo.mail : [];
     }
     return null;
 }
