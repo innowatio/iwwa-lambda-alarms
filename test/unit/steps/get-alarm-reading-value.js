@@ -1,6 +1,7 @@
 import chai, {expect} from "chai";
 import sinon from "sinon";
 import sinonChai from "sinon-chai";
+import moment from "moment";
 chai.use(sinonChai);
 
 import getAlarmReadingValue from "steps/get-alarm-reading-value";
@@ -13,7 +14,7 @@ import {
 } from "../../utils";
 
 describe("`getAlarmReadingValue` function", () => {
-
+    const lastEmailSent = moment().subtract(1, "hour").unix();
     const getDailyAggregate = sinon.stub().returns(dayAggregateActiveEnergy);
     const getConsumptionAggregate = sinon.stub().returns(yearAggregateActiveEnergy);
 
@@ -46,9 +47,8 @@ describe("`getAlarmReadingValue` function", () => {
     });
 
     describe("when alarm type is daily", () => {
-
         it("return the sum of the consumption of the day", async () => {
-            const ret = await getAlarmReadingValue(alarmDaily(10), readingActiveEnergy);
+            const ret = await getAlarmReadingValue(alarmDaily(10, lastEmailSent), readingActiveEnergy);
             expect(ret).to.equal(16.66);
         });
 
@@ -61,7 +61,7 @@ describe("`getAlarmReadingValue` function", () => {
                 measurementValue: "2",
                 unitOfMeasurement: "kWh"
             };
-            const ret = await getAlarmReadingValue(alarmDaily(10), reading);
+            const ret = await getAlarmReadingValue(alarmDaily(10, lastEmailSent), reading);
             expect(ret).to.equal(10.1);
         });
 
@@ -70,7 +70,7 @@ describe("`getAlarmReadingValue` function", () => {
     describe("when alarm type is monthly", () => {
 
         it("return the sum of the consumption of the month", async () => {
-            const ret = await getAlarmReadingValue(alarmMonthly(10), readingActiveEnergy);
+            const ret = await getAlarmReadingValue(alarmMonthly(10, lastEmailSent), readingActiveEnergy);
             expect(ret).to.equal(107.06);
         });
 
@@ -83,7 +83,7 @@ describe("`getAlarmReadingValue` function", () => {
                 measurementValue: "2",
                 unitOfMeasurement: "kWh"
             };
-            const ret = await getAlarmReadingValue(alarmMonthly(10), reading);
+            const ret = await getAlarmReadingValue(alarmMonthly(10, lastEmailSent), reading);
             expect(ret).to.equal(100.5);
         });
 

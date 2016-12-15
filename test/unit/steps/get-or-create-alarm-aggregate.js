@@ -1,4 +1,5 @@
 import {expect} from "chai";
+import moment from "moment";
 
 import {ALARMS_AGGREGATES_COLLECTION_NAME} from "config";
 import {alarmDaily, alarmMonthly, alarmRealtime, getEnergyReadings} from "../../utils";
@@ -6,7 +7,7 @@ import {getMongoClient} from "services/mongodb";
 import {getOrCreateAlarmAggregate} from "steps/get-or-create-alarm-aggregate";
 
 describe("`getOrCreateAlarmAggregate` function", () => {
-
+    const lastEmailSent = moment().subtract(1, "hour").unix();
     var db;
     var alarmsAggregates;
 
@@ -36,7 +37,7 @@ describe("`getOrCreateAlarmAggregate` function", () => {
             };
             const reading = getEnergyReadings("2016-01-28T00:16:36.389Z").data.element;
             await alarmsAggregates.insert(alarmAggregate);
-            const ret = await getOrCreateAlarmAggregate(reading, alarmRealtime(2));
+            const ret = await getOrCreateAlarmAggregate(reading, alarmRealtime(2, lastEmailSent));
             expect(ret).to.deep.equal(alarmAggregate);
         });
 
@@ -50,7 +51,7 @@ describe("`getOrCreateAlarmAggregate` function", () => {
                 measurementTimes: null
             };
             const reading = getEnergyReadings("2016-10-28T00:16:36.389Z").data.element;
-            const ret = await getOrCreateAlarmAggregate(reading, alarmRealtime(3));
+            const ret = await getOrCreateAlarmAggregate(reading, alarmRealtime(3, lastEmailSent));
             expect(ret).to.deep.equal(expectedAggregate);
         });
 
@@ -69,7 +70,7 @@ describe("`getOrCreateAlarmAggregate` function", () => {
             };
             const reading = getEnergyReadings("2016-01-28T00:16:36.389Z").data.element;
             await alarmsAggregates.insert(alarmAggregate);
-            const ret = await getOrCreateAlarmAggregate(reading, alarmDaily(10));
+            const ret = await getOrCreateAlarmAggregate(reading, alarmDaily(10, lastEmailSent));
             expect(ret).to.deep.equal(alarmAggregate);
         });
 
@@ -83,7 +84,7 @@ describe("`getOrCreateAlarmAggregate` function", () => {
                 measurementTimes: null
             };
             const reading = getEnergyReadings("2016-10-28T00:16:36.389Z").data.element;
-            const ret = await getOrCreateAlarmAggregate(reading, alarmDaily(10));
+            const ret = await getOrCreateAlarmAggregate(reading, alarmDaily(10, lastEmailSent));
             expect(ret).to.deep.equal(expectedAggregate);
         });
 

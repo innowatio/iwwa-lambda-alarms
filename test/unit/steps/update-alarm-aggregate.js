@@ -1,4 +1,5 @@
 import {expect} from "chai";
+import moment from "moment";
 
 import updateAlarmAggregate from "steps/update-alarm-aggregate";
 import {alarmDaily, alarmRealtime, getEnergyReadings} from "../../utils";
@@ -6,6 +7,7 @@ import {alarmDaily, alarmRealtime, getEnergyReadings} from "../../utils";
 describe("`updateAlarmAggregate` function", () => {
 
     const reading = getEnergyReadings("2016-01-28T02:16:36.389Z").data.element;
+    const lastEmailSent = moment().subtract(1, "hour").unix();
 
     describe("with alarm realtime", () => {
 
@@ -138,7 +140,7 @@ describe("`updateAlarmAggregate` function", () => {
                     value: 1, time: 1453939200000
                 }]
             };
-            const ret = updateAlarmAggregate(aggregate, reading, alarmStatus, alarmDaily(1));
+            const ret = updateAlarmAggregate(aggregate, reading, alarmStatus, alarmDaily(1, lastEmailSent));
             expect(ret).to.deep.equal({
                 _id: "alarmId-2016-01-28",
                 date: "2016-01-28",
@@ -162,7 +164,7 @@ describe("`updateAlarmAggregate` function", () => {
                     value: 1, time: 1453957200000
                 }]
             };
-            const ret = updateAlarmAggregate(aggregate, reading, alarmStatus, alarmDaily(1));
+            const ret = updateAlarmAggregate(aggregate, reading, alarmStatus, alarmDaily(1, lastEmailSent));
             expect(ret).to.deep.equal({
                 _id: "alarmId-2016-01-28",
                 date: "2016-01-28",
@@ -184,7 +186,7 @@ describe("`updateAlarmAggregate` function", () => {
                 measurementTimes: null,
                 measurements: []
             };
-            const ret = updateAlarmAggregate(aggregate, reading, alarmStatus, alarmRealtime(1));
+            const ret = updateAlarmAggregate(aggregate, reading, alarmStatus, alarmRealtime(1, lastEmailSent));
             expect(ret).to.deep.equal({
                 _id: "alarmId-2016-01-28",
                 date: "2016-01-28",
@@ -212,7 +214,7 @@ describe("`updateAlarmAggregate` function", () => {
                     value: 1, time: 1453939200000
                 }]
             };
-            const ret = updateAlarmAggregate(aggregate, reading, alarmStatus, alarmDaily(10));
+            const ret = updateAlarmAggregate(aggregate, reading, alarmStatus, alarmDaily(10, lastEmailSent));
             expect(ret).to.deep.equal({
                 _id: "alarmId-2016-01-28",
                 date: "2016-01-28",
@@ -234,7 +236,7 @@ describe("`updateAlarmAggregate` function", () => {
                 measurementTimes: null,
                 measurements: []
             };
-            const ret = updateAlarmAggregate(aggregate, reading, alarmStatus, alarmDaily(10));
+            const ret = updateAlarmAggregate(aggregate, reading, alarmStatus, alarmDaily(10, lastEmailSent));
             expect(ret).to.deep.equal(null);
         });
 

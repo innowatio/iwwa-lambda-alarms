@@ -56,7 +56,7 @@ export const user = ({
     ]
 });
 
-export const alarmRealtime = (thresholdValue) => ({
+export const alarmRealtime = (thresholdValue, lastEmailSent) => ({
     "_id": "alarmIdRealtime",
     "userId": "userId",
     "sensorId": "sensorId",
@@ -65,10 +65,11 @@ export const alarmRealtime = (thresholdValue) => ({
     "thresholdRule": `{"$gt": ${thresholdValue}}`,
     "unitOfMeasurement": "kWh",
     "threshold": thresholdValue,
-    "email": true
+    "email": true,
+    "lastEmailSent": lastEmailSent
 });
 
-export const alarmDaily  = (thresholdValue) => ({
+export const alarmDaily  = (thresholdValue, lastEmailSent) => ({
     "_id": "alarmIdDaily",
     "userId": "userId",
     "sensorId": "sensorId",
@@ -77,10 +78,11 @@ export const alarmDaily  = (thresholdValue) => ({
     "thresholdRule": `{"$gt": ${thresholdValue}}`,
     "unitOfMeasurement": "kWh",
     "threshold": thresholdValue,
-    "email": true
+    "email": true,
+    "lastEmailSent": lastEmailSent
 });
 
-export const alarmMonthly = (thresholdValue) => ({
+export const alarmMonthly = (thresholdValue, lastEmailSent) => ({
     "_id": "alarmIdMonthly",
     "userId": "userId",
     "sensorId": "sensorId",
@@ -89,7 +91,8 @@ export const alarmMonthly = (thresholdValue) => ({
     "thresholdRule": `{"$gt": ${thresholdValue}}`,
     "unitOfMeasurement": "kWh",
     "threshold": thresholdValue,
-    "email": true
+    "email": true,
+    "lastEmailSent": lastEmailSent
 });
 
 export const dayAggregateActiveEnergy = {

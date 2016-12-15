@@ -11,7 +11,7 @@ describe("`getUserEmail` function", () => {
     var users;
     const email = "user.test@mail.com";
 
-    nock("https://sso.innowatio.it/openam/json/users").get("/user.test").times(2).reply(200, {
+    nock("https://sso.innowatio.it/openam/json/users").get("/user.test").times(3).reply(200, {
         username: "user.test",
         realm: "/",
         uid: [ "user.test" ],

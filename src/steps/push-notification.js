@@ -1,8 +1,10 @@
 import {v4} from "node-uuid";
+import moment from "moment";
 
-import {NOTIFICATIONS_INSERT, EVENT_EMAIL_INSERT} from "../config";
+import {NOTIFICATIONS_INSERT, EVENT_EMAIL_INSERT, EMAIL_INTERVAL} from "../config";
 import getMessage from "../lib/notification-message";
-import {getUserEmail} from "../steps/get-user-email";
+import {getUserEmail} from "./get-user-email";
+import upsertLastEmailSent from "./upsert-last-email-sent.js";
 import dispatchEvent from "../services/lk-dispatcher";
 import log from "../services/logger";
 import {isAlarmTriggeredForTheFirstTime, isAlarmEnded} from "./trigger-push-notifications";
@@ -38,7 +40,15 @@ async function putNotificationRecordsInKinesis (alarm, message) {
 
     // check if is enabled email notifications
     if (alarm.email) {
-        await dispatchEvent(EVENT_EMAIL_INSERT, eventEmail);
+        // check when last mail was sent
+        const lastEmailSent = Number(alarm.lastEmailSent);
+        const diff = moment().diff(moment(lastEmailSent*1000), "hours");
+        const send = lastEmailSent ? diff >= EMAIL_INTERVAL : false;
+        // if the last mail was sent not in the last hours send a new mail and update lastEmailSent
+        if (send) {
+            await dispatchEvent(EVENT_EMAIL_INSERT, eventEmail);
+            await upsertLastEmailSent(alarm);
+        }
     }
 
     await dispatchEvent(NOTIFICATIONS_INSERT, eventData);

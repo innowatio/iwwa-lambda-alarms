@@ -2,6 +2,7 @@ import chai, {expect} from "chai";
 import sinon from "sinon";
 import sinonChai from "sinon-chai";
 import nock from "nock";
+import moment from "moment";
 chai.use(sinonChai);
 
 import {handler} from "index";
@@ -189,9 +190,9 @@ describe("On reading", () => {
     describe("realtime alarm for the selected sensorId", () => {
 
         describe("without an alarm aggregate", () => {
-
             it("save the correct reading on alarm aggregated collection [CASE: alarm not triggered]", async () => {
-                await alarms.insert(alarmRealtime(10));
+                const lastEmailSent = moment().subtract(1, "hour").unix();
+                await alarms.insert(alarmRealtime(10, lastEmailSent));
                 const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
                 const expectedAlarmAggregate = [{
                     _id: "alarmIdRealtime-2016-01-28",
@@ -207,14 +208,16 @@ describe("On reading", () => {
             });
 
             it("don't put the event in kinesis stream [CASE: alarm triggered]", async () => {
-                await alarms.insert(alarmRealtime(10));
+                const lastEmailSent = moment().subtract(1, "hour").unix();
+                await alarms.insert(alarmRealtime(10, lastEmailSent));
                 const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
                 await run(handler, event);
                 expect(dispatchEvent).to.have.callCount(0);
             });
 
             it("save the correct reading on alarm aggregated collection [CASE: alarm triggered]", async () => {
-                await alarms.insert(alarmRealtime(2));
+                const lastEmailSent = moment().subtract(1, "hour").unix();
+                await alarms.insert(alarmRealtime(2, lastEmailSent));
                 const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
                 const expectedAlarmAggregate = [{
                     _id: "alarmIdRealtime-2016-01-28",
@@ -230,7 +233,8 @@ describe("On reading", () => {
             });
 
             it("put the event in kinesis stream [CASE: alarm triggered]", async () => {
-                await alarms.insert(alarmRealtime(2));
+                const lastEmailSent = moment().subtract(1, "hour").unix();
+                await alarms.insert(alarmRealtime(2, lastEmailSent));
                 const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
 
                 const expectedEventEmail = {
@@ -255,8 +259,24 @@ describe("On reading", () => {
                     expectedEventData
                 );
             });
+
+            it("put the event in kinesis stream [CASE: alarm triggered but already triggered in the last EMAIL_INTERVAL]", async () => {
+                const lastEmailSent = moment().subtract(10, "minutes").unix();
+                await alarms.insert(alarmRealtime(2, lastEmailSent));
+                const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
+
+                await run(handler, event);
+                expect(dispatchEvent).to.have.callCount(1);
+
+                expect(dispatchEvent).to.have.been.calledWith(
+                    NOTIFICATIONS_INSERT,
+                    expectedEventData
+                );
+            });
+
             it("don't put the event in kinesis stream [CASE: alarm triggered but already archived]", async () => {
-                await alarms.insert(alarmRealtime(2));
+                const lastEmailSent = moment().subtract(1, "hour").unix();
+                await alarms.insert(alarmRealtime(2, lastEmailSent));
                 const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading", undefined, true));
                 await run(handler, event);
                 expect(dispatchEvent).to.have.callCount(0);
@@ -264,7 +284,6 @@ describe("On reading", () => {
         });
 
         describe("with an alarm aggregate [CASE: alarm already triggered]", () => {
-
             const realtimeAlarmAggregate = {
                 _id: "alarmIdRealtime-2016-01-28",
                 date: "2016-01-28",
@@ -275,7 +294,8 @@ describe("On reading", () => {
             };
 
             it("save the correct reading on alarm aggregated collection [CASE: alarm not triggered]", async () => {
-                await alarms.insert(alarmRealtime(10));
+                const lastEmailSent = moment().subtract(1, "hour").unix();
+                await alarms.insert(alarmRealtime(10, lastEmailSent));
                 await alarmsAggregates.insert(realtimeAlarmAggregate);
                 const event = getEventFromObject(getEnergyReadings("2016-01-28T07:41:36.389Z", "reading"));
                 const expectedAlarmAggregate = [{
@@ -292,7 +312,8 @@ describe("On reading", () => {
             });
 
             it("put the correct notifications event in kinesis stream [CASE: alarm ended]", async () => {
-                await alarms.insert(alarmRealtime(10));
+                const lastEmailSent = moment().subtract(1, "hour").unix();
+                await alarms.insert(alarmRealtime(10, lastEmailSent));
                 await alarmsAggregates.insert(realtimeAlarmAggregate);
                 const event = getEventFromObject(getEnergyReadings("2016-01-28T07:41:36.389Z", "reading"));
 
@@ -320,7 +341,8 @@ describe("On reading", () => {
             });
 
             it("save the correct reading on alarm aggregated collection [CASE: alarm triggered]", async () => {
-                await alarms.insert(alarmRealtime(2));
+                const lastEmailSent = moment().subtract(1, "hour").unix();
+                await alarms.insert(alarmRealtime(2, lastEmailSent));
                 await alarmsAggregates.insert(realtimeAlarmAggregate);
                 const event = getEventFromObject(getEnergyReadings("2016-01-28T07:41:36.389Z", "reading"));
                 const expectedAlarmAggregate = [{
@@ -337,7 +359,8 @@ describe("On reading", () => {
             });
 
             it("put the correct notifications event in kinesis stream [CASE: alarm triggered]", async () => {
-                await alarms.insert(alarmRealtime(2));
+                const lastEmailSent = moment().subtract(1, "hour").unix();
+                await alarms.insert(alarmRealtime(2, lastEmailSent));
                 await alarmsAggregates.insert(realtimeAlarmAggregate);
                 const event = getEventFromObject(getEnergyReadings("2016-01-28T04:00:00.000Z", "reading"));
 
@@ -367,7 +390,6 @@ describe("On reading", () => {
         });
 
         describe("with an alarm aggregate [CASE: alarm never triggered]", () => {
-
             const realtimeAlarmAggregate = {
                 _id: "alarmIdRealtime-2016-01-28",
                 date: "2016-01-28",
@@ -378,7 +400,8 @@ describe("On reading", () => {
             };
 
             it("save the correct reading on alarm aggregated collection [CASE: alarm not triggered]", async () => {
-                await alarms.insert(alarmRealtime(10));
+                const lastEmailSent = moment().subtract(1, "hour").unix();
+                await alarms.insert(alarmRealtime(10, lastEmailSent));
                 await alarmsAggregates.insert(realtimeAlarmAggregate);
                 const event = getEventFromObject(getEnergyReadings("2016-01-28T02:41:36.389Z", "reading"));
                 const expectedAlarmAggregate = [{
@@ -395,7 +418,8 @@ describe("On reading", () => {
             });
 
             it("don't call the dispatchEvent function [CASE: alarm not triggered]", async () => {
-                await alarms.insert(alarmRealtime(10));
+                const lastEmailSent = moment().subtract(1, "hour").unix();
+                await alarms.insert(alarmRealtime(10, lastEmailSent));
                 await alarmsAggregates.insert(realtimeAlarmAggregate);
                 const event = getEventFromObject(getEnergyReadings("2016-01-28T02:41:36.389Z", "reading"));
                 await run(handler, event);
@@ -403,7 +427,8 @@ describe("On reading", () => {
             });
 
             it("save the correct reading on alarm aggregated collection [CASE: alarm triggered]", async () => {
-                await alarms.insert(alarmRealtime(2));
+                const lastEmailSent = moment().subtract(1, "hour").unix();
+                await alarms.insert(alarmRealtime(2, lastEmailSent));
                 await alarmsAggregates.insert(realtimeAlarmAggregate);
                 const event = getEventFromObject(getEnergyReadings("2016-01-28T02:41:36.389Z", "reading"));
                 const expectedAlarmAggregate = [{
@@ -420,7 +445,8 @@ describe("On reading", () => {
             });
 
             it("put the correct notifications event in kinesis stream [CASE: alarm triggered]", async () => {
-                await alarms.insert(alarmRealtime(2));
+                const lastEmailSent = moment().subtract(1, "hour").unix();
+                await alarms.insert(alarmRealtime(2, lastEmailSent));
                 await alarmsAggregates.insert(realtimeAlarmAggregate);
                 const event = getEventFromObject(getEnergyReadings("2016-01-28T02:41:36.389Z", "reading"));
 
@@ -454,7 +480,8 @@ describe("On reading", () => {
     describe("daily alarm for the selected sensorId", () => {
 
         it("with alarm not triggered skip the alarm aggregate update step", async () => {
-            await alarms.insert(alarmDaily(20));
+            const lastEmailSent = moment().subtract(1, "hour").unix();
+            await alarms.insert(alarmDaily(20, lastEmailSent));
             const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
             await run(handler, event);
             const alarmAggregate = await alarmsAggregates.find({}).toArray();
@@ -462,14 +489,16 @@ describe("On reading", () => {
         });
 
         it("with alarm not triggered don't call the dispatchEvent function", async () => {
-            await alarms.insert(alarmDaily(20));
+            const lastEmailSent = moment().subtract(1, "hour").unix();
+            await alarms.insert(alarmDaily(20, lastEmailSent));
             const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
             await run(handler, event);
             expect(dispatchEvent).to.have.callCount(0);
         });
 
         it("on alarm triggered save the correct reading on alarm aggregated collection", async () => {
-            await alarms.insert(alarmDaily(16.907));
+            const lastEmailSent = moment().subtract(1, "hour").unix();
+            await alarms.insert(alarmDaily(16.907, lastEmailSent));
             const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
             const expectedAlarmAggregate = [{
                 _id: "alarmIdDaily-2016-01-28",
@@ -485,7 +514,8 @@ describe("On reading", () => {
         });
 
         it("on alarm triggered call the dispatchEvent function with correct event", async () => {
-            await alarms.insert(alarmDaily(16));
+            const lastEmailSent = moment().subtract(1, "hour").unix();
+            await alarms.insert(alarmDaily(16, lastEmailSent));
             const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
             const expectedEventData = {
                 element: {
@@ -521,7 +551,8 @@ describe("On reading", () => {
         });
 
         it("on multiple reading save only the correct one on alarm aggregated collection", async () => {
-            await alarms.insert(alarmDaily(16.907));
+            const lastEmailSent = moment().subtract(1, "hour").unix();
+            await alarms.insert(alarmDaily(16.907, lastEmailSent));
             const event1 = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
             const event2 = getEventFromObject(getEnergyReadings("2016-01-28T03:25:00.544Z", "reading"));
             const event3 = getEventFromObject(getEnergyReadings("2016-01-28T08:25:00.544Z", "reading"));
@@ -543,9 +574,9 @@ describe("On reading", () => {
     });
 
     describe("monthly alarm for the selected sensorId", () => {
-
         it("with alarm not triggered skip the alarm aggregate update step", async () => {
-            await alarms.insert(alarmMonthly(110));
+            const lastEmailSent = moment().subtract(1, "hour").unix();
+            await alarms.insert(alarmMonthly(110, lastEmailSent));
             const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
             await run(handler, event);
             const alarmAggregate = await alarmsAggregates.find({}).toArray();
@@ -553,14 +584,16 @@ describe("On reading", () => {
         });
 
         it("with alarm not triggered don't call the dispatchEvent function", async () => {
-            await alarms.insert(alarmDaily(20));
+            const lastEmailSent = moment().subtract(1, "hour").unix();
+            await alarms.insert(alarmDaily(20, lastEmailSent));
             const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
             await run(handler, event);
             expect(dispatchEvent).to.have.callCount(0);
         });
 
         it("on alarm triggered save the correct reading on alarm aggregated collection", async () => {
-            await alarms.insert(alarmMonthly(80));
+            const lastEmailSent = moment().subtract(1, "hour").unix();
+            await alarms.insert(alarmMonthly(80, lastEmailSent));
             const event = getEventFromObject(getEnergyReadings("2016-01-28T01:14:26.389Z", "reading"));
             const expectedAlarmAggregate = [{
                 _id: "alarmIdMonthly-2016-01",
@@ -576,7 +609,8 @@ describe("On reading", () => {
         });
 
         it("on alarm triggered call the dispatchEvent function with correct event", async () => {
-            await alarms.insert(alarmMonthly(80));
+            const lastEmailSent = moment().subtract(1, "hour").unix();
+            await alarms.insert(alarmMonthly(80, lastEmailSent));
             const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
 
             const expectedEventData = {
@@ -613,7 +647,8 @@ describe("On reading", () => {
         });
 
         it("on multiple reading save only the correct one on alarm aggregated collection", async () => {
-            await alarms.insert(alarmMonthly(80));
+            const lastEmailSent = moment().subtract(1, "hour").unix();
+            await alarms.insert(alarmMonthly(80, lastEmailSent));
             const event1 = getEventFromObject(getEnergyReadings("2016-01-28T01:14:26.389Z", "reading"));
             const event2 = getEventFromObject(getEnergyReadings("2016-01-28T03:25:00.544Z", "reading"));
             const event3 = getEventFromObject(getEnergyReadings("2016-01-28T08:25:00.544Z", "reading"));
@@ -635,7 +670,6 @@ describe("On reading", () => {
     });
 
     describe("with more alarm on a sensorId", () => {
-
         it("save the correct reading on alarm aggregated collection and call dispatchEvent function with correct arguments", async () => {
             const alarm = {
                 _id: "alarmIdRealtimeReactive",
@@ -647,9 +681,10 @@ describe("On reading", () => {
                 threshold: 2,
                 unitOfMeasurement: "kVArh"
             };
-            await alarms.insert(alarmRealtime(10));
-            await alarms.insert(alarmDaily(20));
-            await alarms.insert(alarmMonthly(2));
+            const lastEmailSent = moment().subtract(1, "hour").unix();
+            await alarms.insert(alarmRealtime(10, lastEmailSent));
+            await alarms.insert(alarmDaily(20, lastEmailSent));
+            await alarms.insert(alarmMonthly(2, lastEmailSent));
             await alarms.insert(alarm);
             const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
             const expectedAlarmAggregate = [{
