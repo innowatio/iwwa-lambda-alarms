@@ -10,7 +10,7 @@ export default async function upsertLastEmailSent (alarm) {
     };
     return db.collection(ALARMS_COLLECTION_NAME).update(
         {_id: alarm._id},
-        {$set: newAlarm},
+        newAlarm,
         {upsert: true}
     );
 }
