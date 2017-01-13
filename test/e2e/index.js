@@ -15,6 +15,7 @@ import {
     CONSUMPTION_AGGREGATES_COLLECTION_NAME,
     NOTIFICATIONS_INSERT,
     EVENT_EMAIL_INSERT,
+    EVENT_ALARM_INSERT,
     USERS_COLLECTION_NAME
 } from "config";
 import pipeline from "pipeline";
@@ -30,6 +31,8 @@ import {
     user,
 } from "../utils";
 import pushNotification from "steps/push-notification";
+import checkAndUpdateAlarm from "steps/check-and-update-alarm";
+
 
 
 describe("On reading", () => {
@@ -104,6 +107,15 @@ describe("On reading", () => {
         id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
     };
 
+    const expectedEventAlarm = {
+        count: {
+            day: 0,
+            night: 1
+        },
+        date: "2016-01-28T01:16:36+01:00",
+        sensorId: "sensorId"
+    };
+
     const expectedEventDataSolved = {
         element: {
             type: "alarm",
@@ -148,6 +160,8 @@ describe("On reading", () => {
 
         pushNotification.__Rewire__("dispatchEvent", dispatchEvent);
         pushNotification.__Rewire__("v4", v4);
+        checkAndUpdateAlarm.__Rewire__("dispatchEvent", dispatchEvent);
+        checkAndUpdateAlarm.__Rewire__("v4", v4);
 
     });
 
@@ -160,8 +174,12 @@ describe("On reading", () => {
         await db.dropCollection(ALARMS_AGGREGATES_COLLECTION_NAME);
         await db.dropCollection(DAILY_AGGREGATES_COLLECTION_NAME);
         await db.dropCollection(CONSUMPTION_AGGREGATES_COLLECTION_NAME);
+
         pushNotification.__ResetDependency__("dispatchEvent");
         pushNotification.__ResetDependency__("v4");
+
+        checkAndUpdateAlarm.__ResetDependency__("dispatchEvent");
+        checkAndUpdateAlarm.__ResetDependency__("v4");
 
     });
 
@@ -246,8 +264,10 @@ describe("On reading", () => {
                     }
                 };
 
+
+
                 await run(handler, event);
-                expect(dispatchEvent).to.have.callCount(2);
+                expect(dispatchEvent).to.have.callCount(3);
 
                 expect(dispatchEvent.firstCall).to.have.been.calledWith(
                     EVENT_EMAIL_INSERT,
@@ -258,6 +278,11 @@ describe("On reading", () => {
                     NOTIFICATIONS_INSERT,
                     expectedEventData
                 );
+
+                expect(dispatchEvent.thirdCall).to.have.been.calledWith(
+                    EVENT_ALARM_INSERT,
+                    expectedEventAlarm
+                );
             });
 
             it("put the event in kinesis stream [CASE: alarm triggered but already triggered in the last EMAIL_INTERVAL]", async () => {
@@ -266,11 +291,16 @@ describe("On reading", () => {
                 const event = getEventFromObject(getEnergyReadings("2016-01-28T00:16:36.389Z", "reading"));
 
                 await run(handler, event);
-                expect(dispatchEvent).to.have.callCount(1);
+                expect(dispatchEvent).to.have.callCount(2);
 
-                expect(dispatchEvent).to.have.been.calledWith(
+                expect(dispatchEvent.firstCall).to.have.been.calledWith(
                     NOTIFICATIONS_INSERT,
                     expectedEventData
+                );
+
+                expect(dispatchEvent.secondCall).to.have.been.calledWith(
+                    EVENT_ALARM_INSERT,
+                    expectedEventAlarm
                 );
             });
 
@@ -373,8 +403,17 @@ describe("On reading", () => {
                     }
                 };
 
+                const expectedEventAlarm = {
+                    count: {
+                        day: 5,
+                        night: 0
+                    },
+                    date: "2016-01-28T10:00:00+01:00",
+                    sensorId: "sensorId"
+                };
+
                 await run(handler, event);
-                expect(dispatchEvent).to.have.callCount(2);
+                expect(dispatchEvent).to.have.callCount(3);
 
                 expect(dispatchEvent.firstCall).to.have.been.calledWith(
                     EVENT_EMAIL_INSERT,
@@ -385,6 +424,12 @@ describe("On reading", () => {
                     NOTIFICATIONS_INSERT,
                     expectedEventData
                 );
+
+                expect(dispatchEvent.thirdCall).to.have.been.calledWith(
+                    EVENT_ALARM_INSERT,
+                    expectedEventAlarm
+                );
+
             });
 
         });
@@ -459,8 +504,17 @@ describe("On reading", () => {
                     }
                 };
 
+                const expectedEventAlarm = {
+                    count: {
+                        day: 0,
+                        night: 1
+                    },
+                    date: "2016-01-28T05:00:00+01:00",
+                    sensorId: "sensorId"
+                };
+
                 await run(handler, event);
-                expect(dispatchEvent).to.have.callCount(2);
+                expect(dispatchEvent).to.have.callCount(3);
 
                 expect(dispatchEvent.firstCall).to.have.been.calledWith(
                     EVENT_EMAIL_INSERT,
@@ -470,6 +524,11 @@ describe("On reading", () => {
                 expect(dispatchEvent.secondCall).to.have.been.calledWith(
                     NOTIFICATIONS_INSERT,
                     expectedEventData
+                );
+
+                expect(dispatchEvent.thirdCall).to.have.been.calledWith(
+                    EVENT_ALARM_INSERT,
+                    expectedEventAlarm
                 );
             });
 
@@ -537,7 +596,7 @@ describe("On reading", () => {
             };
 
             await run(handler, event);
-            expect(dispatchEvent).to.have.callCount(2);
+            expect(dispatchEvent).to.have.callCount(3);
 
             expect(dispatchEvent.firstCall).to.have.been.calledWith(
                 EVENT_EMAIL_INSERT,
@@ -547,6 +606,11 @@ describe("On reading", () => {
             expect(dispatchEvent.secondCall).to.have.been.calledWith(
                 NOTIFICATIONS_INSERT,
                 expectedEventData
+            );
+
+            expect(dispatchEvent.thirdCall).to.have.been.calledWith(
+                EVENT_ALARM_INSERT,
+                expectedEventAlarm
             );
         });
 
@@ -633,7 +697,7 @@ describe("On reading", () => {
             };
 
             await run(handler, event);
-            expect(dispatchEvent).to.have.callCount(2);
+            expect(dispatchEvent).to.have.callCount(3);
 
             expect(dispatchEvent.firstCall).to.have.been.calledWith(
                 EVENT_EMAIL_INSERT,
@@ -643,6 +707,11 @@ describe("On reading", () => {
             expect(dispatchEvent.secondCall).to.have.been.calledWith(
                 NOTIFICATIONS_INSERT,
                 expectedEventData
+            );
+
+            expect(dispatchEvent.thirdCall).to.have.been.calledWith(
+                EVENT_ALARM_INSERT,
+                expectedEventAlarm
             );
         });
 
@@ -718,15 +787,6 @@ describe("On reading", () => {
                 },
                 id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
             };
-            const expectedBody2 = {
-                element: {
-                    type: "alarm",
-                    title: "Allarme",
-                    message: monthlyMessage,
-                    usersId: ["userId"]
-                },
-                id: "d9b16d2d-9e08-4466-939f-534c8c25a00a"
-            };
 
             const expectedEventEmail = {
                 element: {
@@ -737,20 +797,32 @@ describe("On reading", () => {
                 }
             };
 
+            const expectEventAlarm = {
+                count: {
+                    day: 0,
+                    night: 1
+                },
+                date: "2016-01-28T01:16:36+01:00",
+                sensorId: "sensorId"
+            };
+
             await run(handler, event);
-            expect(dispatchEvent).to.have.callCount(3);
+            expect(dispatchEvent).to.have.callCount(5);
             expect(dispatchEvent.firstCall).to.have.been.calledWith(
                 NOTIFICATIONS_INSERT,
                 expectedBody1
             );
+
             expect(dispatchEvent.secondCall).to.have.been.calledWith(
+                EVENT_ALARM_INSERT,
+                expectEventAlarm
+            );
+
+            expect(dispatchEvent.thirdCall).to.have.been.calledWith(
                 EVENT_EMAIL_INSERT,
                 expectedEventEmail
             );
-            expect(dispatchEvent.thirdCall).to.have.been.calledWith(
-                NOTIFICATIONS_INSERT,
-                expectedBody2
-            );
+
             const alarmAggregate = await alarmsAggregates.find({}).toArray();
             expect(alarmAggregate).to.deep.equal(expectedAlarmAggregate);
         });

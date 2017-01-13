@@ -1,3 +1,5 @@
+import moment from "moment";
+import R from "ramda";
 import siftValidator from "../lib/sift-validator";
 import getAlarmReadingValue from "./get-alarm-reading-value";
 import {getOrCreateAlarmAggregate} from "./get-or-create-alarm-aggregate";
@@ -8,6 +10,8 @@ import {triggerPushNotifications} from "./trigger-push-notifications";
 import stringifyAggregate from "./stringify-aggregate";
 import updateAlarmAggregate from "./update-alarm-aggregate";
 import upsertAggregate from "./upsert-aggregate";
+import {EVENT_ALARM_INSERT} from "../config";
+import dispatchEvent from "../services/lk-dispatcher";
 
 export default async function checkAndUpdateAlarm (alarm, reading, event) {
     log.debug(alarm, "alarm");
@@ -23,6 +27,7 @@ export default async function checkAndUpdateAlarm (alarm, reading, event) {
         log.info({alarm});
         return null;
     }
+
     const alarmAggregate = await getOrCreateAlarmAggregate(reading, alarm);
     const parsedAlarmAggregate = parseAggregate(alarmAggregate);
     const updatedAlarmAggregate = updateAlarmAggregate(parsedAlarmAggregate, reading, alarmTriggerStatus, alarm);
@@ -33,5 +38,32 @@ export default async function checkAndUpdateAlarm (alarm, reading, event) {
     await upsertAggregate(aggregate);
     if (triggerPushNotifications(event, reading)) {
         await pushNotification(alarm, alarmTriggerStatus, reading, aggregate);
+        if (alarmTriggerStatus) {
+            const alarmCount = countAlrmByTime(aggregate, alarm.sensorId);
+            await dispatchEvent(EVENT_ALARM_INSERT, alarmCount);
+        }
+
     }
+}
+function countAlrmByTime (aggregate, sensorId) {
+    const measurementValues= aggregate.measurementValues.split(",");
+    const measurementTimes= aggregate.measurementTimes.split(",");
+    const lastMeasurementTimes = moment(parseInt(R.last(measurementTimes))).format();
+    var alarm = {
+        sensorId,
+        date: lastMeasurementTimes,
+        count:{
+            day:0,
+            night:0
+        }
+    };
+    measurementTimes.map((time, index) =>{
+        const hour = moment(parseInt(time)).format("H");
+        if (hour < 5 || hour > 23) {
+            alarm.count.night +=parseInt(measurementValues[index]);
+        } else {
+            alarm.count.day +=parseInt(measurementValues[index]);
+        }
+    });
+    return alarm;
 }

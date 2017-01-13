@@ -6,5 +6,5 @@ import kinesis from "services/kinesis";
 export default getDispatch({
     kinesisClient: kinesis,
     kinesisStream: config.KINESIS_STREAM_NAME,
-    producerId: config.PRODUCER
+    producerId: config.KINESIS_PRODUCER_ID
 });
