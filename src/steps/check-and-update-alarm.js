@@ -48,7 +48,7 @@ export default async function checkAndUpdateAlarm (alarm, reading, event) {
 function countAlrmByTime (aggregate, sensorId) {
     const measurementValues= aggregate.measurementValues.split(",");
     const measurementTimes= aggregate.measurementTimes.split(",");
-    const lastMeasurementTimes = moment(parseInt(R.last(measurementTimes))).format();
+    const lastMeasurementTimes = moment.utc(parseInt(R.last(measurementTimes))).format();
     var alarm = {
         sensorId,
         date: lastMeasurementTimes,
@@ -58,7 +58,7 @@ function countAlrmByTime (aggregate, sensorId) {
         }
     };
     measurementTimes.map((time, index) =>{
-        const hour = moment(parseInt(time)).format("H");
+        const hour = moment.utc(parseInt(time)).format("H");
         if (hour < 5 || hour > 23) {
             alarm.count.night +=parseInt(measurementValues[index]);
         } else {

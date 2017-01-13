@@ -112,7 +112,7 @@ describe("On reading", () => {
             day: 0,
             night: 1
         },
-        date: "2016-01-28T01:16:36+01:00",
+        date: "2016-01-28T00:16:36Z",
         sensorId: "sensorId"
     };
 
@@ -405,10 +405,10 @@ describe("On reading", () => {
 
                 const expectedEventAlarm = {
                     count: {
-                        day: 5,
-                        night: 0
+                        day: 4,
+                        night: 1
                     },
-                    date: "2016-01-28T10:00:00+01:00",
+                    date: "2016-01-28T09:00:00Z",
                     sensorId: "sensorId"
                 };
 
@@ -509,7 +509,7 @@ describe("On reading", () => {
                         day: 0,
                         night: 1
                     },
-                    date: "2016-01-28T05:00:00+01:00",
+                    date: "2016-01-28T04:00:00Z",
                     sensorId: "sensorId"
                 };
 
@@ -802,7 +802,7 @@ describe("On reading", () => {
                     day: 0,
                     night: 1
                 },
-                date: "2016-01-28T01:16:36+01:00",
+                date: "2016-01-28T00:16:36Z",
                 sensorId: "sensorId"
             };
 
