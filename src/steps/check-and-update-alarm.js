@@ -17,6 +17,7 @@ export default async function checkAndUpdateAlarm (alarm, reading, event) {
     log.debug(alarm, "alarm");
     // Skip if alarm not match the rule
     if (!siftValidator(alarm.rule, reading)) {
+        log.info("skip alarm because not match the rule");
         log.info({alarm});
         return null;
     }
@@ -34,18 +35,22 @@ export default async function checkAndUpdateAlarm (alarm, reading, event) {
     if (!updateAlarmAggregate) {
         return null;
     }
+    log.info({updateAlarmAggregate});
     const aggregate = stringifyAggregate(updatedAlarmAggregate);
     await upsertAggregate(aggregate);
     if (triggerPushNotifications(event, reading)) {
         await pushNotification(alarm, alarmTriggerStatus, reading, aggregate);
+        log.info({alarmTriggerStatus});
         if (alarmTriggerStatus) {
             const alarmCount = countAlrmByTime(aggregate, alarm.sensorId);
+            log.info({alarmCount});
             await dispatchEvent(EVENT_ALARM_INSERT, alarmCount);
         }
 
     }
 }
 function countAlrmByTime (aggregate, sensorId) {
+    log.info("countAlrmByTime");
     const measurementValues= aggregate.measurementValues.split(",");
     const measurementTimes= aggregate.measurementTimes.split(",");
     const lastMeasurementTimes = moment.utc(parseInt(R.last(measurementTimes))).format();

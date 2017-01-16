@@ -7,6 +7,7 @@ import skipReading from "./steps/skip-reading";
 import spreadReadingByMeasurementType from "./steps/spread-reading-by-measurement-type";
 
 export default async function pipeline (event) {
+    log.info("pipeline");
     log.info({event});
     /*
     *   Workaround: some events have been incorrectly generated and thus don't
@@ -19,6 +20,7 @@ export default async function pipeline (event) {
     }
     // find all the alarms for the selected sensor
     const alarms = await findAlarmsBySensor(rawReading.sensorId);
+    log.info("find all the alarms for the selected sensor");
     log.info({alarms});
     const readings = spreadReadingByMeasurementType(rawReading);
 
