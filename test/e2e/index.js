@@ -108,12 +108,14 @@ describe("On reading", () => {
     };
 
     const expectedEventAlarm = {
-        count: {
-            day: 0,
-            night: 1
-        },
-        date: "2016-01-28T00:16:36Z",
-        sensorId: "sensorId"
+        element: {
+            count: {
+                day: 0,
+                night: 1
+            },
+            date: "2016-01-28T00:16:36Z",
+            sensorId: "sensorId"
+        }
     };
 
     const expectedEventDataSolved = {
@@ -404,12 +406,14 @@ describe("On reading", () => {
                 };
 
                 const expectedEventAlarm = {
-                    count: {
-                        day: 4,
-                        night: 1
-                    },
-                    date: "2016-01-28T09:00:00Z",
-                    sensorId: "sensorId"
+                    element: {
+                        count: {
+                            day: 4,
+                            night: 1
+                        },
+                        date: "2016-01-28T09:00:00Z",
+                        sensorId: "sensorId"
+                    }
                 };
 
                 await run(handler, event);
@@ -505,12 +509,14 @@ describe("On reading", () => {
                 };
 
                 const expectedEventAlarm = {
-                    count: {
-                        day: 0,
-                        night: 1
-                    },
-                    date: "2016-01-28T04:00:00Z",
-                    sensorId: "sensorId"
+                    element:{
+                        count: {
+                            day: 0,
+                            night: 1
+                        },
+                        date: "2016-01-28T04:00:00Z",
+                        sensorId: "sensorId"
+                    }
                 };
 
                 await run(handler, event);
@@ -798,12 +804,14 @@ describe("On reading", () => {
             };
 
             const expectEventAlarm = {
-                count: {
-                    day: 0,
-                    night: 1
-                },
-                date: "2016-01-28T00:16:36Z",
-                sensorId: "sensorId"
+                element:{
+                    count: {
+                        day: 0,
+                        night: 1
+                    },
+                    date: "2016-01-28T00:16:36Z",
+                    sensorId: "sensorId"
+                }
             };
 
             await run(handler, event);

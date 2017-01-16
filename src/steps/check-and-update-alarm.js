@@ -55,19 +55,21 @@ function countAlrmByTime (aggregate, sensorId) {
     const measurementTimes= aggregate.measurementTimes.split(",");
     const lastMeasurementTimes = moment.utc(parseInt(R.last(measurementTimes))).format();
     var alarm = {
-        sensorId,
-        date: lastMeasurementTimes,
-        count:{
-            day:0,
-            night:0
+        element :{
+            sensorId,
+            date: lastMeasurementTimes,
+            count:{
+                day:0,
+                night:0
+            }
         }
     };
     measurementTimes.map((time, index) =>{
         const hour = moment.utc(parseInt(time)).format("H");
         if (hour < 5 || hour > 23) {
-            alarm.count.night +=parseInt(measurementValues[index]);
+            alarm.element.count.night +=parseInt(measurementValues[index]);
         } else {
-            alarm.count.day +=parseInt(measurementValues[index]);
+            alarm.element.count.day +=parseInt(measurementValues[index]);
         }
     });
     return alarm;
